@@ -3,20 +3,28 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Agentic Legacy Modernization System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: ingestion
+    description: Repository ingestion agent
+  - name: analysis
+    description: Code analysis agent
+  - name: prd
+    description: PRD generation agent
+  - name: jobs
+    description: Job status tracking
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +32,220 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /agent/ingest:
+    post:
+      operationId: ingestRepository
+      tags: [ingestion]
+      summary: Ingest a repository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestRequest"
+      responses:
+        "201":
+          description: Ingestion started and completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/projects:
+    get:
+      operationId: listProjects
+      tags: [ingestion]
+      summary: List all projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Project"
+                required: [projects]
+
+  /agent/projects/{id}:
+    get:
+      operationId: getProject
+      tags: [ingestion]
+      summary: Get project by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/analyze:
+    post:
+      operationId: analyzeProject
+      tags: [analysis]
+      summary: Analyze a project's codebase and extract API routes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeRequest"
+      responses:
+        "201":
+          description: Analysis complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzeResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/projects/{projectId}/apis:
+    get:
+      operationId: listApis
+      tags: [analysis]
+      summary: List extracted APIs for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of APIs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apis:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiRoute"
+                required: [apis]
+
+  /agent/generate-prd:
+    post:
+      operationId: generatePrd
+      tags: [prd]
+      summary: Generate a PRD document for a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeneratePRDRequest"
+      responses:
+        "201":
+          description: PRD generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratePRDResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/projects/{projectId}/documents:
+    get:
+      operationId: listDocuments
+      tags: [prd]
+      summary: List documents for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Document"
+                required: [documents]
+
+  /agent/jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List all agent jobs
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Job"
+                required: [jobs]
+
+  /agent/jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get job status by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +253,158 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error]
+
+    IngestRequest:
+      type: object
+      properties:
+        repoUrl:
+          type: string
+          format: uri
+      required: [repoUrl]
+
+    IngestResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        projectId:
+          type: string
+        projectName:
+          type: string
+        fileCount:
+          type: integer
+      required: [jobId, projectId, projectName, fileCount]
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        repo_url:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        file_count:
+          type: integer
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      required: [id, repo_url, name, status, file_count, created_at, updated_at]
+
+    AnalyzeRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+      required: [projectId]
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        projectId:
+          type: string
+        apiCount:
+          type: integer
+        apis:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiRoute"
+      required: [jobId, projectId, apiCount, apis]
+
+    ApiRoute:
+      type: object
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        description:
+          type: string
+          nullable: true
+        handler:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+      required: [id, project_id, method, path, created_at]
+
+    GeneratePRDRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+      required: [projectId]
+
+    GeneratePRDResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        documentId:
+          type: string
+        projectId:
+          type: string
+        title:
+          type: string
+      required: [jobId, documentId, projectId, title]
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string
+      required: [id, project_id, type, title, content, created_at]
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        agentType:
+          type: string
+        projectId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        message:
+          type: string
+        startedAt:
+          type: string
+        completedAt:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+      required: [id, agentType, status, message, startedAt]

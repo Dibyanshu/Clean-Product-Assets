@@ -1,0 +1,163 @@
+You are a senior backend architect. Build a clean, production-grade Node.js backend for an “Agentic Legacy Modernization System”.
+
+Tech Stack Requirements
+
+* Node.js (latest LTS)
+* Fastify (NOT Express)
+* TypeScript
+* SQLite (using better-sqlite3 or drizzle ORM)
+* Modular architecture (NO monolith file)
+* Use clean architecture principles (controller → service → repository)
+
+Core Concept
+
+This system orchestrates multiple AI agents to analyze a legacy codebase and generate structured outputs like APIs, PRD, HLD, and user stories.
+
+Folder Structure (MANDATORY)
+
+/src
+/modules
+/ingestion
+/analysis
+/prd
+/services
+/repositories
+/db
+/utils
+app.ts
+server.ts
+
+Requirements
+
+1. Create Fastify Server
+
+* Proper plugin-based structure
+* Logging enabled
+* Error handling middleware
+
+⸻
+
+2. Database Setup
+
+* SQLite connection
+* Tables:
+    * projects
+    * files
+    * apis
+    * documents
+    * approvals
+
+⸻
+
+3. Implement 3 Core Agents
+
+Agent 1: Ingestion
+
+POST /agent/ingest
+
+Input:
+{
+“repoUrl”: “string”
+}
+
+Behavior:
+
+* Clone repo locally (mock if needed)
+* Read file structure
+* Store metadata in DB
+
+⸻
+
+Agent 2: Analysis
+
+POST /agent/analyze
+
+Input:
+{
+“projectId”: “string”
+}
+
+Behavior:
+
+* Read stored files
+* Extract API routes (mock logic initially)
+* Store APIs in DB
+
+⸻
+
+Agent 3: PRD Generator
+
+POST /agent/generate-prd
+
+Input:
+{
+“projectId”: “string”
+}
+
+Behavior:
+
+* Read APIs
+* Generate simple PRD text (mock LLM for now)
+* Store in documents table
+
+⸻
+
+4. Service Layer (IMPORTANT)
+
+* All business logic must be in services
+* Controllers should be thin
+
+⸻
+
+5. Repository Layer
+
+* All DB access should be abstracted
+
+⸻
+
+6. Add Mock LLM Service
+
+* Create a service that simulates AI output
+* Example:
+    generatePRD(data) → returns structured text
+
+⸻
+
+7. Add Basic Validation
+
+* Use zod or similar
+
+⸻
+
+8. Keep Code Clean
+
+* No large files (>200 lines)
+* Proper naming
+* Use async/await
+
+⸻
+
+Output Expectations
+
+* Fully working API server
+* Can run with npm run dev
+* Includes README with setup steps
+* Include sample curl requests
+
+⸻
+
+DO NOT
+
+* Do not use Express
+* Do not put logic in controllers
+* Do not skip folder structure
+* Do not overcomplicate
+
+⸻
+
+BONUS (if possible)
+
+* Add a simple in-memory job status tracker
+* Add request logging per agent
+
+Build this step by step and explain each file briefly.

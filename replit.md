@@ -1,8 +1,8 @@
-# Workspace
+# Agentic Legacy Modernization System
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A production-grade backend + React dashboard for orchestrating AI agents to analyze legacy codebases and generate structured outputs (APIs, PRD, HLD, user stories).
 
 ## Stack
 
@@ -10,18 +10,65 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
+- **API framework**: Express 5 (clean architecture)
+- **SQLite**: sql.js (pure JS, in-memory)
+- **Validation**: Zod
+- **Frontend**: React + Vite + Tailwind CSS + Shadcn UI
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+
+## Architecture
+
+- **Controller → Service → Repository** pattern
+- Three AI agents: Ingestion, Analysis, PRD Generator
+- In-memory job status tracker
+- Mock LLM service for PRD generation
 
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/healthz | Health check |
+| POST | /api/agent/ingest | Agent 1: Ingest repository |
+| GET | /api/agent/projects | List all projects |
+| GET | /api/agent/projects/:id | Get project |
+| POST | /api/agent/analyze | Agent 2: Analyze project |
+| GET | /api/agent/projects/:id/apis | List extracted APIs |
+| POST | /api/agent/generate-prd | Agent 3: Generate PRD |
+| GET | /api/agent/projects/:id/documents | List documents |
+| GET | /api/agent/jobs | List all jobs |
+| GET | /api/agent/jobs/:id | Get job by ID |
+
+## Folder Structure
+
+```
+artifacts/api-server/src/
+├── app.ts                     # Express app setup + DB init
+├── index.ts                   # Server entrypoint
+├── db/sqlite.ts               # SQLite (sql.js) singleton
+├── db/migrate.ts              # Schema migrations
+├── modules/
+│   ├── ingestion/             # Agent 1
+│   ├── analysis/              # Agent 2
+│   └── prd/                   # Agent 3 + Mock LLM
+├── routes/agent.ts            # All agent routes
+└── utils/jobTracker.ts        # In-memory job tracker
+
+artifacts/legacy-modernization-ui/
+└── src/
+    ├── pages/
+    │   ├── dashboard.tsx       # Mission control pipeline UI
+    │   ├── projects-list.tsx   # All projects table
+    │   ├── project-detail.tsx  # APIs, PRD, job history
+    │   └── jobs-list.tsx       # Global operations log
+    └── components/
+        ├── layout.tsx
+        └── status-badge.tsx
+```
