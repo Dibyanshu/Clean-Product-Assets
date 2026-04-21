@@ -29,6 +29,7 @@ export async function ingestHandler(
       status: "completed",
       message: "Ingestion complete",
       completedAt: new Date().toISOString(),
+      projectId: result.projectId,
       result,
     });
 
