@@ -100,5 +100,42 @@ export async function runMigrations(): Promise<void> {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS api_function_map (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      api_id TEXT NOT NULL,
+      function_name TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 1.0,
+      FOREIGN KEY (project_id) REFERENCES projects(id),
+      FOREIGN KEY (api_id) REFERENCES apis(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS function_table_map (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      function_name TEXT NOT NULL,
+      table_name TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 1.0,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS api_table_map (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      api_id TEXT NOT NULL,
+      table_name TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 1.0,
+      FOREIGN KEY (project_id) REFERENCES projects(id),
+      FOREIGN KEY (api_id) REFERENCES apis(id)
+    )
+  `);
+
   logger.info("Database migrations complete");
 }

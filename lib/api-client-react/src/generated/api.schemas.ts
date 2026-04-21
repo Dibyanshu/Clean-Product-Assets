@@ -190,6 +190,59 @@ export interface SearchResponse {
   results: SearchResultItem[];
 }
 
+export interface GenerateLineageRequest {
+  projectId: string;
+}
+
+export type LineageTableRefOperation =
+  (typeof LineageTableRefOperation)[keyof typeof LineageTableRefOperation];
+
+export const LineageTableRefOperation = {
+  SELECT: "SELECT",
+  INSERT: "INSERT",
+  UPDATE: "UPDATE",
+  DELETE: "DELETE",
+  QUERY: "QUERY",
+} as const;
+
+export interface LineageTableRef {
+  name: string;
+  operation: LineageTableRefOperation;
+  confidence: number;
+}
+
+export interface LineageApiRef {
+  id: string;
+  method: string;
+  path: string;
+  handler?: string | null;
+}
+
+export type LineageEntryStatus =
+  (typeof LineageEntryStatus)[keyof typeof LineageEntryStatus];
+
+export const LineageEntryStatus = {
+  mapped: "mapped",
+  partial: "partial",
+  unknown: "unknown",
+} as const;
+
+export interface LineageEntry {
+  api: LineageApiRef;
+  tables: LineageTableRef[];
+  flow: string[];
+  status: LineageEntryStatus;
+}
+
+export interface LineageResponse {
+  projectId: string;
+  apiCount: number;
+  mappedCount: number;
+  partialCount: number;
+  unknownCount: number;
+  entries: LineageEntry[];
+}
+
 export type ListProjects200 = {
   projects: Project[];
 };
@@ -204,6 +257,13 @@ export type ListDocuments200 = {
 
 export type ListJobs200 = {
   jobs: Job[];
+};
+
+export type GetLineageParams = {
+  /**
+   * Project ID
+   */
+  projectId: string;
 };
 
 export type SemanticSearchParams = {

@@ -25,12 +25,15 @@ import type {
   ErrorResponse,
   ExtractDbSchemaRequest,
   ExtractDbSchemaResponse,
+  GenerateLineageRequest,
   GeneratePRDRequest,
   GeneratePRDResponse,
+  GetLineageParams,
   HealthStatus,
   IngestRequest,
   IngestResponse,
   Job,
+  LineageResponse,
   ListApis200,
   ListDocuments200,
   ListJobs200,
@@ -1115,6 +1118,186 @@ export const useTestAstMulti = <
 > => {
   return useMutation(getTestAstMultiMutationOptions(options));
 };
+
+/**
+ * @summary Generate API ↔ DB lineage mapping for a project
+ */
+export const getGenerateLineageUrl = () => {
+  return `/api/agent/generate-lineage`;
+};
+
+export const generateLineage = async (
+  generateLineageRequest: GenerateLineageRequest,
+  options?: RequestInit,
+): Promise<LineageResponse> => {
+  return customFetch<LineageResponse>(getGenerateLineageUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateLineageRequest),
+  });
+};
+
+export const getGenerateLineageMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateLineage>>,
+    TError,
+    { data: BodyType<GenerateLineageRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateLineage>>,
+  TError,
+  { data: BodyType<GenerateLineageRequest> },
+  TContext
+> => {
+  const mutationKey = ["generateLineage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateLineage>>,
+    { data: BodyType<GenerateLineageRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return generateLineage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateLineageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateLineage>>
+>;
+export type GenerateLineageMutationBody = BodyType<GenerateLineageRequest>;
+export type GenerateLineageMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Generate API ↔ DB lineage mapping for a project
+ */
+export const useGenerateLineage = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateLineage>>,
+    TError,
+    { data: BodyType<GenerateLineageRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateLineage>>,
+  TError,
+  { data: BodyType<GenerateLineageRequest> },
+  TContext
+> => {
+  return useMutation(getGenerateLineageMutationOptions(options));
+};
+
+/**
+ * @summary Get stored API ↔ DB lineage for a project
+ */
+export const getGetLineageUrl = (params: GetLineageParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/agent/lineage?${stringifiedParams}`
+    : `/api/agent/lineage`;
+};
+
+export const getLineage = async (
+  params: GetLineageParams,
+  options?: RequestInit,
+): Promise<LineageResponse> => {
+  return customFetch<LineageResponse>(getGetLineageUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLineageQueryKey = (params?: GetLineageParams) => {
+  return [`/api/agent/lineage`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetLineageQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLineage>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetLineageParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLineage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLineageQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLineage>>> = ({
+    signal,
+  }) => getLineage(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLineage>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLineageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLineage>>
+>;
+export type GetLineageQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get stored API ↔ DB lineage for a project
+ */
+
+export function useGetLineage<
+  TData = Awaited<ReturnType<typeof getLineage>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetLineageParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLineage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLineageQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Semantic vector search over indexed code and schema

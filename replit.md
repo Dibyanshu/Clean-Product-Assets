@@ -20,7 +20,7 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 ## Architecture
 
 - **Controller → Service → Repository** pattern
-- Four AI agents: Ingestion, Analysis, PRD Generator, DB Schema Extractor
+- Five AI agents: Ingestion, Analysis, PRD Generator, DB Schema Extractor, Lineage Mapper
 - In-memory vector store (TF-IDF cosine similarity, ChromaDB-compatible interface)
 - Pluggable multi-language AST chunker: JS/TS (Babel real AST), Java, C#, SQL (pattern-based)
 - Semantic search endpoint: `GET /api/agent/search?projectId=&q=`
@@ -52,6 +52,8 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 | GET | /api/agent/projects/:id/db-schema | Get extracted DB schema |
 | GET | /api/agent/jobs | List all jobs |
 | GET | /api/agent/jobs/:id | Get job by ID |
+| POST | /api/agent/generate-lineage | Agent 5: Generate API ↔ DB lineage |
+| GET | /api/agent/lineage | Get stored lineage for project |
 
 ## Folder Structure
 

@@ -1,0 +1,245 @@
+You are a senior backend architect. Extend the existing Fastify-based Node.js application to implement **API ↔ DB lineage mapping**.
+
+This feature must trace how API endpoints interact with database tables through functions/services and store this relationship in a structured way.
+
+---
+
+# 🎯 OBJECTIVE
+
+Build a system that maps:
+
+API Endpoint → Function → Database Tables → Operation (SELECT/INSERT/UPDATE/DELETE)
+
+---
+
+# 🧱 ARCHITECTURE ADDITION
+
+Create a new module:
+
+/modules/lineage
+lineage.controller.ts
+lineage.service.ts
+lineage.repository.ts
+
+---
+
+# 🗄️ DATABASE CHANGES
+
+Add new tables:
+
+### api_function_map
+
+* id
+* project_id
+* api_id
+* function_name
+
+---
+
+### function_table_map
+
+* id
+* project_id
+* function_name
+* table_name
+* operation (SELECT | INSERT | UPDATE | DELETE)
+
+---
+
+### api_table_map (derived but stored for quick access)
+
+* id
+* project_id
+* api_id
+* table_name
+* operation
+
+---
+
+# 🔍 DATA SOURCES (USE EXISTING SYSTEM)
+
+Use data already available from:
+
+* AST chunks (functions, APIs)
+* DB schema extraction
+* Chroma (optional context)
+
+---
+
+# ⚙️ IMPLEMENT LINEAGE SERVICE
+
+## Step 1: Map API → Function
+
+From AST chunks:
+
+* Identify API routes:
+
+  * Express/Fastify: app.get/post
+  * .NET: [HttpGet], [HttpPost]
+
+* Extract handler function name
+
+Store in:
+api_function_map
+
+---
+
+## Step 2: Map Function → DB Tables
+
+Scan function content for:
+
+### Raw SQL:
+
+* SELECT * FROM table
+* INSERT INTO table
+* UPDATE table
+* DELETE FROM table
+
+### ORM patterns (basic):
+
+* prisma.user.findMany → users
+* knex('users')
+* db.query("...")
+
+Use regex + simple parsing
+
+Store in:
+function_table_map
+
+---
+
+## Step 3: Build API → Table Mapping
+
+Join:
+
+* api_function_map
+* function_table_map
+
+Store in:
+api_table_map
+
+---
+
+# 📦 OUTPUT FORMAT
+
+```json id="l9k7mw"
+{
+  "api": "/orders",
+  "method": "POST",
+  "tables": [
+    {
+      "name": "orders",
+      "operation": "INSERT"
+    }
+  ],
+  "flow": [
+    "OrderController.create",
+    "OrderService.create",
+    "OrderRepository.save"
+  ]
+}
+```
+
+---
+
+# 🔌 CREATE ENDPOINT
+
+GET /agent/lineage
+
+Query:
+
+* projectId
+
+Returns:
+
+* all API → DB mappings
+
+---
+
+# 🧪 ADD TRIGGER
+
+POST /agent/generate-lineage
+
+Input:
+
+```json id="p6zjhw"
+{
+  "projectId": "string"
+}
+```
+
+Behavior:
+
+* Runs full lineage mapping
+* Stores results
+* Returns summary
+
+---
+
+# 🖥️ FRONTEND INTEGRATION
+
+In existing UI:
+
+Add new tab:
+👉 "LINEAGE"
+
+Display:
+
+For each API:
+
+* Method + route
+* Tables used
+* Operations
+* Flow (function chain)
+
+---
+
+# 🎨 UI FORMAT
+
+Card per API:
+
+Example:
+
+POST /orders
+
+Tables:
+
+* orders (INSERT)
+* order_items (INSERT)
+
+Flow:
+Controller → Service → Repository
+
+---
+
+# ⚠️ IMPORTANT RULES
+
+* DO NOT use LLM for initial implementation
+* Use deterministic parsing (AST + regex)
+* Keep service modular
+* Handle missing mappings gracefully
+
+---
+
+# 📈 SUCCESS CRITERIA
+
+* APIs correctly mapped to functions
+* Functions mapped to tables
+* Operations detected
+* UI displays meaningful lineage
+
+---
+
+# BONUS
+
+* Add confidence score
+* Add “unknown” category when detection fails
+* Add re-run lineage button
+
+---
+
+# EXPLAIN
+
+1. How API → function mapping works
+2. How SQL/ORM parsing is done
+3. Limitations and future improvements

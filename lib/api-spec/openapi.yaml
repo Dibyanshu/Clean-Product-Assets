@@ -22,6 +22,8 @@ tags:
     description: Job status tracking
   - name: search
     description: Semantic vector search across code and schema
+  - name: lineage
+    description: API ↔ DB lineage mapping agent
 
 paths:
   /healthz:
@@ -314,6 +316,63 @@ paths:
                 $ref: "#/components/schemas/AstTestResponse"
         "400":
           description: Unsupported file type or missing fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/generate-lineage:
+    post:
+      operationId: generateLineage
+      tags: [lineage]
+      summary: Generate API ↔ DB lineage mapping for a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateLineageRequest"
+      responses:
+        "201":
+          description: Lineage mapping complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineageResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Lineage generation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/lineage:
+    get:
+      operationId: getLineage
+      tags: [lineage]
+      summary: Get stored API ↔ DB lineage for a project
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      responses:
+        "200":
+          description: Lineage mapping result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineageResponse"
+        "400":
+          description: Missing projectId parameter
           content:
             application/json:
               schema:
@@ -719,3 +778,73 @@ components:
           items:
             $ref: "#/components/schemas/SearchResultItem"
       required: [projectId, query, indexedDocuments, results]
+
+    GenerateLineageRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+      required: [projectId]
+
+    LineageTableRef:
+      type: object
+      properties:
+        name:
+          type: string
+        operation:
+          type: string
+          enum: [SELECT, INSERT, UPDATE, DELETE, QUERY]
+        confidence:
+          type: number
+      required: [name, operation, confidence]
+
+    LineageApiRef:
+      type: object
+      properties:
+        id:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        handler:
+          type: string
+          nullable: true
+      required: [id, method, path]
+
+    LineageEntry:
+      type: object
+      properties:
+        api:
+          $ref: "#/components/schemas/LineageApiRef"
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineageTableRef"
+        flow:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [mapped, partial, unknown]
+      required: [api, tables, flow, status]
+
+    LineageResponse:
+      type: object
+      properties:
+        projectId:
+          type: string
+        apiCount:
+          type: integer
+        mappedCount:
+          type: integer
+        partialCount:
+          type: integer
+        unknownCount:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineageEntry"
+      required: [projectId, apiCount, mappedCount, partialCount, unknownCount, entries]

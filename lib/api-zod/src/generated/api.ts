@@ -223,6 +223,53 @@ export const TestAstMultiResponse = zod.object({
 });
 
 /**
+ * @summary Generate API ↔ DB lineage mapping for a project
+ */
+export const GenerateLineageBody = zod.object({
+  projectId: zod.string(),
+});
+
+/**
+ * @summary Get stored API ↔ DB lineage for a project
+ */
+export const GetLineageQueryParams = zod.object({
+  projectId: zod.coerce.string().describe("Project ID"),
+});
+
+export const GetLineageResponse = zod.object({
+  projectId: zod.string(),
+  apiCount: zod.number(),
+  mappedCount: zod.number(),
+  partialCount: zod.number(),
+  unknownCount: zod.number(),
+  entries: zod.array(
+    zod.object({
+      api: zod.object({
+        id: zod.string(),
+        method: zod.string(),
+        path: zod.string(),
+        handler: zod.string().nullish(),
+      }),
+      tables: zod.array(
+        zod.object({
+          name: zod.string(),
+          operation: zod.enum([
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "QUERY",
+          ]),
+          confidence: zod.number(),
+        }),
+      ),
+      flow: zod.array(zod.string()),
+      status: zod.enum(["mapped", "partial", "unknown"]),
+    }),
+  ),
+});
+
+/**
  * @summary Semantic vector search over indexed code and schema
  */
 export const semanticSearchQueryNDefault = 5;

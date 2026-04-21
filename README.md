@@ -23,6 +23,28 @@ A production-grade monorepo that orchestrates multiple AI agents to parse, analy
 
 ## Agents
 
+### Agent 5 — Lineage Mapper
+Traces how each API endpoint flows through service/repository functions into database table operations. Produces a three-level map:
+
+```
+API Endpoint → Handler Function → Database Tables + Operations
+```
+
+Detection is fully deterministic — no LLM involved:
+
+| Source | Pattern | Confidence |
+|---|---|---|
+| Raw SQL string in code | `SELECT … FROM table` / `INSERT INTO table` / etc. | 100% |
+| db.query / db.run calls | Inline SQL literals in Node.js db helpers | 90% |
+| Prisma ORM | `prisma.user.findMany()` → `users SELECT` | 85% |
+| Function call chain | Route calls `User.findAll()` → that function has SQL | 85% |
+| Knex query builder | `knex('users')` | 75% |
+| HTTP method + path (fallback) | `GET /api/users` → `users SELECT` | 40% |
+
+Results are stored in three tables (`api_function_map`, `function_table_map`, `api_table_map`) and served via `GET /agent/lineage`.
+
+---
+
 ### Agent 1 — Ingestion
 Parses a repository, records all files, and indexes each file's content into the vector store using **multi-language AST-based chunking**.
 
@@ -141,6 +163,37 @@ Response:
 }
 ```
 
+### Agent 5 — Lineage Mapper
+
+```bash
+# Generate lineage (run after ingest + analyze)
+curl -X POST http://localhost/api/agent/generate-lineage \
+  -H "Content-Type: application/json" \
+  -d '{"projectId": "<projectId>"}'
+
+# Get stored lineage
+curl "http://localhost/api/agent/lineage?projectId=<projectId>"
+```
+
+Response:
+```json
+{
+  "projectId": "...",
+  "apiCount": 10,
+  "mappedCount": 9,
+  "partialCount": 1,
+  "unknownCount": 0,
+  "entries": [
+    {
+      "api": { "method": "GET", "path": "/api/users", "handler": "UserController.list" },
+      "tables": [{ "name": "users", "operation": "SELECT", "confidence": 1.0 }],
+      "flow": ["UserController.list"],
+      "status": "mapped"
+    }
+  ]
+}
+```
+
 ### AST Chunker Test
 
 ```bash
@@ -195,7 +248,12 @@ curl -s -X POST http://localhost/api/agent/generate-prd \
   -H "Content-Type: application/json" \
   -d "{\"projectId\":\"$PROJECT_ID\"}"
 
-# Step 5: Semantic search
+# Step 5: Generate lineage — maps APIs → functions → DB tables
+curl -s -X POST http://localhost/api/agent/generate-lineage \
+  -H "Content-Type: application/json" \
+  -d "{\"projectId\":\"$PROJECT_ID\"}"
+
+# Step 6: Semantic search
 curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authentication+JWT"
 ```
 
@@ -270,6 +328,9 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 | `db_tables` | Extracted database tables |
 | `db_columns` | Columns per table (type, primary key, nullable) |
 | `db_functions` | Extracted SQL functions and stored procedures |
+| `api_function_map` | API endpoint → handler function mapping with confidence |
+| `function_table_map` | Function → DB table + SQL operation mapping |
+| `api_table_map` | Derived API → table mapping (pre-joined for fast reads) |
 
 ---
 
@@ -281,6 +342,7 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 | **DB Schema** | Accordion tables with column types, primary key icons, nullable flags; function list |
 | **Generated PRD** | Full PRD with executive summary, API inventory, user stories, technical requirements |
 | **Vector Search** | Semantic search across 50+ indexed chunks; results show type, file, score bar |
+| **Lineage** | API → function → table trace with operation badges and confidence scores; "Re-run" button |
 | **Job History** | All agent runs for this project with status, timing, and messages |
 
 ---
