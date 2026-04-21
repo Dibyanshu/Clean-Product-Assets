@@ -68,7 +68,12 @@ export async function getTablesForProject(projectId: string): Promise<DbTableRec
     `SELECT * FROM db_tables WHERE project_id = ? ORDER BY name ASC`,
     [projectId],
   );
-  return rowsToObjects(result) as DbTableRecord[];
+  return rowsToObjects(result).map((row) => ({
+    id: String(row.id),
+    project_id: String(row.project_id),
+    name: String(row.name),
+    extracted_at: String(row.extracted_at),
+  }));
 }
 
 export async function getColumnsForTable(tableId: string): Promise<DbColumnRecord[]> {
@@ -77,7 +82,14 @@ export async function getColumnsForTable(tableId: string): Promise<DbColumnRecor
     `SELECT * FROM db_columns WHERE table_id = ? ORDER BY is_primary DESC, name ASC`,
     [tableId],
   );
-  return rowsToObjects(result) as DbColumnRecord[];
+  return rowsToObjects(result).map((row) => ({
+    id: String(row.id),
+    table_id: String(row.table_id),
+    name: String(row.name),
+    type: String(row.type),
+    is_primary: Number(row.is_primary),
+    is_nullable: Number(row.is_nullable),
+  }));
 }
 
 export async function getFunctionsForProject(projectId: string): Promise<DbFunctionRecord[]> {
@@ -86,7 +98,14 @@ export async function getFunctionsForProject(projectId: string): Promise<DbFunct
     `SELECT * FROM db_functions WHERE project_id = ? ORDER BY name ASC`,
     [projectId],
   );
-  return rowsToObjects(result) as DbFunctionRecord[];
+  return rowsToObjects(result).map((row) => ({
+    id: String(row.id),
+    project_id: String(row.project_id),
+    name: String(row.name),
+    parameters: row.parameters !== undefined && row.parameters !== null ? String(row.parameters) : null,
+    description: row.description !== undefined && row.description !== null ? String(row.description) : null,
+    created_at: String(row.created_at),
+  }));
 }
 
 export async function getLatestExtractedAt(projectId: string): Promise<string | null> {

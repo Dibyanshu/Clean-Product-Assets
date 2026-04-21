@@ -402,10 +402,14 @@ export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
 
     if (chunks.length > 0) {
       for (const chunk of chunks) {
+        // Ensure all metadata values are string or undefined for index signature
+        const metadata = Object.fromEntries(
+          Object.entries(chunk.metadata).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : undefined])
+        );
         docs.push({
           id: chunk.id,
           content: chunk.content,
-          metadata: chunk.metadata as Parameters<typeof chroma.upsertDocuments>[1][0]["metadata"],
+          metadata: metadata as Parameters<typeof chroma.upsertDocuments>[1][0]["metadata"],
         });
         langStats[chunk.metadata.language] = (langStats[chunk.metadata.language] ?? 0) + 1;
       }

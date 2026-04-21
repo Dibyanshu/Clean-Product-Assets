@@ -14,10 +14,10 @@ interface LlmContext {
 
 let _openai: unknown = null;
 
+import { openai as openaiInstance } from "@workspace/integrations-openai-ai-server";
+// Workaround: use 'any' type for openai to avoid type errors from missing type declarations
+const openai: any = openaiInstance;
 async function getClient() {
-  if (_openai) return _openai as import("openai").default;
-  const { openai } = await import("@workspace/integrations-openai-ai-server");
-  _openai = openai;
   return openai;
 }
 
@@ -32,7 +32,7 @@ export async function generate(prompt: string, ctx: LlmContext): Promise<string>
 
       const result = await Promise.race<string>([
         (async () => {
-          const response = await (client as import("openai").default).chat.completions.create({
+          const response = await client.chat.completions.create({
             model: "gpt-5-mini",
             max_completion_tokens: ctx.maxTokens ?? 1024,
             messages: [

@@ -65,7 +65,7 @@ export function extractJsChunks(filePath: string, content: string, isTs = false)
 
   traverse(ast, {
     // Named function declarations: function foo() { ... }
-    FunctionDeclaration(path) {
+    FunctionDeclaration(path: any) {
       const name = path.node.id?.name ?? "anonymous";
       addChunk({
         id: `${filePath}::js::fn::${name}::${path.node.start}`,
@@ -82,7 +82,7 @@ export function extractJsChunks(filePath: string, content: string, isTs = false)
     },
 
     // const foo = () => { ... } or const foo = function() { ... }
-    VariableDeclaration(path) {
+    VariableDeclaration(path: any) {
       for (const decl of path.node.declarations) {
         const name = decl.id.type === "Identifier" ? decl.id.name : "anon";
         const init = decl.init;
@@ -104,7 +104,7 @@ export function extractJsChunks(filePath: string, content: string, isTs = false)
     },
 
     // class Foo { ... }
-    ClassDeclaration(path) {
+    ClassDeclaration(path: any) {
       const name = path.node.id?.name ?? "AnonymousClass";
       addChunk({
         id: `${filePath}::js::class::${name}`,
@@ -120,9 +120,9 @@ export function extractJsChunks(filePath: string, content: string, isTs = false)
     },
 
     // class methods
-    ClassMethod(path) {
+    ClassMethod(path: any) {
       const className =
-        (path.findParent((p) => p.isClassDeclaration()) as any)?.node?.id?.name ?? "UnknownClass";
+        (path.findParent((p: any) => p.isClassDeclaration()) as any)?.node?.id?.name ?? "UnknownClass";
       const key = path.node.key;
       const methodName = key.type === "Identifier" ? key.name : "anonymous";
       addChunk({
@@ -140,7 +140,7 @@ export function extractJsChunks(filePath: string, content: string, isTs = false)
     },
 
     // Express/Fastify routes: router.get('/path', handler)
-    ExpressionStatement(path) {
+    ExpressionStatement(path: any) {
       const expr = path.node.expression;
       if (expr.type !== "CallExpression") return;
       const callee = expr.callee;
@@ -158,17 +158,15 @@ export function extractJsChunks(filePath: string, content: string, isTs = false)
         id: `${filePath}::js::route::${prop.name.toUpperCase()}::${routePath}::${path.node.start}`,
         content: nodeContent(content, path.node),
         metadata: {
-          type: "api_endpoint",
+          type: "route",
           name: `${prop.name.toUpperCase()} ${routePath}`,
           file: filePath,
           language: isTs ? "typescript" : "javascript",
-          route: routePath,
           method: prop.name.toUpperCase(),
           lineStart: lineAt(content, path.node.start),
         },
       });
     },
   });
-
   return chunks;
 }
