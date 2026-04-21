@@ -76,6 +76,49 @@ export interface Document {
   created_at: string;
 }
 
+export interface ExtractDbSchemaRequest {
+  projectId: string;
+}
+
+export interface DbColumn {
+  id: string;
+  name: string;
+  type: string;
+  is_primary: boolean;
+  is_nullable: boolean;
+}
+
+export interface DbTable {
+  id: string;
+  name: string;
+  extracted_at: string;
+  columns: DbColumn[];
+}
+
+export interface DbFunction {
+  id: string;
+  name: string;
+  parameters?: string | null;
+  description?: string | null;
+}
+
+export interface ExtractDbSchemaResponse {
+  jobId: string;
+  projectId: string;
+  tableCount: number;
+  functionCount: number;
+  tables: DbTable[];
+  functions: DbFunction[];
+  extractedAt: string;
+}
+
+export interface DbSchemaResult {
+  projectId?: string;
+  tables: DbTable[];
+  functions: DbFunction[];
+  extractedAt?: string | null;
+}
+
 export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
 export const JobStatus = {

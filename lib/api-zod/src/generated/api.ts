@@ -111,6 +111,49 @@ export const ListDocumentsResponse = zod.object({
 });
 
 /**
+ * @summary Extract database schema for a project
+ */
+export const ExtractDbSchemaBody = zod.object({
+  projectId: zod.string(),
+});
+
+/**
+ * @summary Get the extracted DB schema for a project
+ */
+export const GetDbSchemaParams = zod.object({
+  projectId: zod.coerce.string(),
+});
+
+export const GetDbSchemaResponse = zod.object({
+  projectId: zod.string().optional(),
+  tables: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      extracted_at: zod.string(),
+      columns: zod.array(
+        zod.object({
+          id: zod.string(),
+          name: zod.string(),
+          type: zod.string(),
+          is_primary: zod.boolean(),
+          is_nullable: zod.boolean(),
+        }),
+      ),
+    }),
+  ),
+  functions: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      parameters: zod.string().nullish(),
+      description: zod.string().nullish(),
+    }),
+  ),
+  extractedAt: zod.string().nullish(),
+});
+
+/**
  * @summary List all agent jobs
  */
 export const ListJobsResponse = zod.object({

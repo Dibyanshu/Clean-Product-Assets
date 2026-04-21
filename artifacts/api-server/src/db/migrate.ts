@@ -66,5 +66,39 @@ export async function runMigrations(): Promise<void> {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS db_tables (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      extracted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS db_columns (
+      id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      is_primary INTEGER NOT NULL DEFAULT 0,
+      is_nullable INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (table_id) REFERENCES db_tables(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS db_functions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      parameters TEXT,
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
   logger.info("Database migrations complete");
 }

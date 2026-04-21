@@ -1,0 +1,269 @@
+You are a senior full-stack architect. Extend the existing application by adding a new feature: **Database Schema & Functions Extraction**.
+
+This must be implemented end-to-end across:
+
+* Frontend (React UI)
+* Backend (Fastify API)
+* Database (SQLite)
+* Service Layer
+
+---
+
+# 🎯 FEATURE GOAL
+
+Add a new tab in the Project Details page:
+
+👉 **"DB SCHEMA" (2nd tab after API ROUTES)**
+
+This tab should:
+
+1. Extract database schema (tables, columns, relationships)
+2. Extract DB functions / stored procedures (if any)
+3. Display them in structured UI
+4. Persist results in DB
+
+---
+
+# 🖥️ FRONTEND REQUIREMENTS
+
+## 1. Add New Tab
+
+In the existing tabs:
+
+* API ROUTES
+* GENERATED PRD
+* JOB HISTORY
+
+👉 Insert:
+**DB SCHEMA (new 2nd tab)**
+
+---
+
+## 2. DB Schema Tab UI
+
+Create 2 sections:
+
+### Section A: Tables
+
+Display:
+
+* Table name
+* Columns:
+
+  * name
+  * type
+  * primary key
+  * nullable
+
+UI format:
+
+* Expandable accordion per table
+
+---
+
+### Section B: Functions / Procedures
+
+Display:
+
+* Function name
+* Input params
+* Description (if available)
+
+---
+
+## 3. Add Action Button
+
+Button:
+👉 “Extract Schema”
+
+Behavior:
+
+* Calls backend API
+* Shows loading state
+* Refreshes UI after completion
+
+---
+
+# ⚙️ BACKEND REQUIREMENTS (Fastify)
+
+## 1. New Endpoint
+
+POST /agent/extract-db-schema
+
+Input:
+
+```json
+{
+  "projectId": "string"
+}
+```
+
+---
+
+## 2. Controller
+
+* Validate input
+* Call service layer
+* Return structured schema
+
+---
+
+## 3. Service Layer (IMPORTANT)
+
+Create:
+
+/modules/db-schema/dbSchema.service.ts
+
+Responsibilities:
+
+* Connect to database (use stored connection or mock)
+* Extract:
+
+  * Tables
+  * Columns
+  * Types
+  * Primary keys
+* Extract functions (mock if needed)
+
+---
+
+## 4. Repository Layer
+
+Create:
+
+/repositories/dbSchema.repo.ts
+
+Store:
+
+* tables
+* columns
+* functions
+
+---
+
+# 🗄️ DATABASE CHANGES
+
+Add new tables:
+
+### db_tables
+
+* id
+* project_id
+* name
+
+### db_columns
+
+* id
+* table_id
+* name
+* type
+* is_primary
+* is_nullable
+
+### db_functions
+
+* id
+* project_id
+* name
+* parameters
+* description
+
+---
+
+# 🔍 EXTRACTION LOGIC
+
+## Phase 1 (POC - SIMPLE)
+
+If SQLite:
+
+* Query:
+
+  * sqlite_master
+  * PRAGMA table_info(table_name)
+
+---
+
+## Phase 2 (Optional)
+
+* Parse SQL files from repo
+* Extract:
+
+  * CREATE TABLE
+  * CREATE FUNCTION
+
+---
+
+# 🔁 FLOW
+
+1. User clicks "Extract Schema"
+2. Frontend → POST /agent/extract-db-schema
+3. Backend:
+
+   * Reads DB
+   * Extracts schema
+   * Stores in DB
+4. Returns structured response
+5. UI renders tables + functions
+
+---
+
+# 📦 RESPONSE FORMAT
+
+```json
+{
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "primary": true },
+        { "name": "email", "type": "TEXT", "primary": false }
+      ]
+    }
+  ],
+  "functions": []
+}
+```
+
+---
+
+# 🎨 UI EXPECTATIONS
+
+* Clean dark theme (match existing UI)
+* Collapsible sections
+* Loading indicator
+* Empty state:
+  👉 "No schema extracted yet"
+
+---
+
+# ⚠️ IMPORTANT RULES
+
+* DO NOT mix logic in controller
+* Service layer must handle extraction
+* Keep UI modular (new component for tab)
+* Do not break existing tabs
+
+---
+
+# ✅ SUCCESS CRITERIA
+
+* New tab visible
+* Button triggers extraction
+* Data stored in DB
+* UI renders schema correctly
+
+---
+
+# BONUS
+
+* Add "Last Extracted At"
+* Add re-run capability
+* Add loading skeleton
+
+---
+
+Explain:
+
+1. What files were added
+2. How schema extraction works
+3. How frontend connects to backend

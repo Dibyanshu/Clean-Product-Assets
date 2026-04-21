@@ -16,6 +16,8 @@ tags:
     description: Code analysis agent
   - name: prd
     description: PRD generation agent
+  - name: db-schema
+    description: Database schema extraction agent
   - name: jobs
     description: Job status tracking
 
@@ -202,6 +204,50 @@ paths:
                       $ref: "#/components/schemas/Document"
                 required: [documents]
 
+  /agent/extract-db-schema:
+    post:
+      operationId: extractDbSchema
+      tags: [db-schema]
+      summary: Extract database schema for a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractDbSchemaRequest"
+      responses:
+        "201":
+          description: Schema extracted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractDbSchemaResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/projects/{projectId}/db-schema:
+    get:
+      operationId: getDbSchema
+      tags: [db-schema]
+      summary: Get the extracted DB schema for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: DB schema result (empty arrays if never extracted)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbSchemaResult"
+
   /agent/jobs:
     get:
       operationId: listJobs
@@ -383,6 +429,99 @@ components:
         created_at:
           type: string
       required: [id, project_id, type, title, content, created_at]
+
+    ExtractDbSchemaRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+      required: [projectId]
+
+    DbColumn:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        is_primary:
+          type: boolean
+        is_nullable:
+          type: boolean
+      required: [id, name, type, is_primary, is_nullable]
+
+    DbTable:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        extracted_at:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: "#/components/schemas/DbColumn"
+      required: [id, name, extracted_at, columns]
+
+    DbFunction:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        parameters:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+      required: [id, name]
+
+    ExtractDbSchemaResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        projectId:
+          type: string
+        tableCount:
+          type: integer
+        functionCount:
+          type: integer
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/DbTable"
+        functions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DbFunction"
+        extractedAt:
+          type: string
+      required: [jobId, projectId, tableCount, functionCount, tables, functions, extractedAt]
+
+    DbSchemaResult:
+      type: object
+      properties:
+        projectId:
+          type: string
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/DbTable"
+        functions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DbFunction"
+        extractedAt:
+          type: string
+          nullable: true
+      required: [tables, functions]
 
     Job:
       type: object

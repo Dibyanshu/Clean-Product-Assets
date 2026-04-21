@@ -20,9 +20,10 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 ## Architecture
 
 - **Controller → Service → Repository** pattern
-- Three AI agents: Ingestion, Analysis, PRD Generator
+- Four AI agents: Ingestion, Analysis, PRD Generator, DB Schema Extractor
 - In-memory job status tracker
 - Mock LLM service for PRD generation
+- Mock schema extraction (tables, columns, functions)
 
 ## Key Commands
 
@@ -43,6 +44,8 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 | GET | /api/agent/projects/:id/apis | List extracted APIs |
 | POST | /api/agent/generate-prd | Agent 3: Generate PRD |
 | GET | /api/agent/projects/:id/documents | List documents |
+| POST | /api/agent/extract-db-schema | Agent 4: Extract DB schema |
+| GET | /api/agent/projects/:id/db-schema | Get extracted DB schema |
 | GET | /api/agent/jobs | List all jobs |
 | GET | /api/agent/jobs/:id | Get job by ID |
 

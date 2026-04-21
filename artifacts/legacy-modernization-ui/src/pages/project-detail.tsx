@@ -1,10 +1,11 @@
 import { useGetProject, useListApis, useListDocuments, useListJobs } from "@workspace/api-client-react";
+import { DbSchemaTab } from "@/components/db-schema-tab";
 import { useParams } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FolderGit2, FileText, Activity, Server, Clock, GitBranch, TerminalSquare, Search, ChevronLeft } from "lucide-react";
+import { FileText, Activity, Server, Clock, GitBranch, TerminalSquare, Search, ChevronLeft, Database } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,10 @@ export function ProjectDetail() {
             <Server className="w-3 h-3 mr-2" />
             API Routes ({apisData?.apis.length || 0})
           </TabsTrigger>
+          <TabsTrigger value="db-schema" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-db-schema">
+            <Database className="w-3 h-3 mr-2" />
+            DB Schema
+          </TabsTrigger>
           <TabsTrigger value="prd" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-prd">
             <FileText className="w-3 h-3 mr-2" />
             Generated PRD
@@ -136,6 +141,10 @@ export function ProjectDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="db-schema" className="mt-0">
+          <DbSchemaTab projectId={id!} />
         </TabsContent>
 
         <TabsContent value="prd" className="mt-0">

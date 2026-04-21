@@ -19,7 +19,10 @@ import type {
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
+  DbSchemaResult,
   ErrorResponse,
+  ExtractDbSchemaRequest,
+  ExtractDbSchemaResponse,
   GeneratePRDRequest,
   GeneratePRDResponse,
   HealthStatus,
@@ -702,6 +705,179 @@ export function useListDocuments<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListDocumentsQueryOptions(projectId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Extract database schema for a project
+ */
+export const getExtractDbSchemaUrl = () => {
+  return `/api/agent/extract-db-schema`;
+};
+
+export const extractDbSchema = async (
+  extractDbSchemaRequest: ExtractDbSchemaRequest,
+  options?: RequestInit,
+): Promise<ExtractDbSchemaResponse> => {
+  return customFetch<ExtractDbSchemaResponse>(getExtractDbSchemaUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(extractDbSchemaRequest),
+  });
+};
+
+export const getExtractDbSchemaMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof extractDbSchema>>,
+    TError,
+    { data: BodyType<ExtractDbSchemaRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof extractDbSchema>>,
+  TError,
+  { data: BodyType<ExtractDbSchemaRequest> },
+  TContext
+> => {
+  const mutationKey = ["extractDbSchema"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof extractDbSchema>>,
+    { data: BodyType<ExtractDbSchemaRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return extractDbSchema(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExtractDbSchemaMutationResult = NonNullable<
+  Awaited<ReturnType<typeof extractDbSchema>>
+>;
+export type ExtractDbSchemaMutationBody = BodyType<ExtractDbSchemaRequest>;
+export type ExtractDbSchemaMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Extract database schema for a project
+ */
+export const useExtractDbSchema = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof extractDbSchema>>,
+    TError,
+    { data: BodyType<ExtractDbSchemaRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof extractDbSchema>>,
+  TError,
+  { data: BodyType<ExtractDbSchemaRequest> },
+  TContext
+> => {
+  return useMutation(getExtractDbSchemaMutationOptions(options));
+};
+
+/**
+ * @summary Get the extracted DB schema for a project
+ */
+export const getGetDbSchemaUrl = (projectId: string) => {
+  return `/api/agent/projects/${projectId}/db-schema`;
+};
+
+export const getDbSchema = async (
+  projectId: string,
+  options?: RequestInit,
+): Promise<DbSchemaResult> => {
+  return customFetch<DbSchemaResult>(getGetDbSchemaUrl(projectId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDbSchemaQueryKey = (projectId: string) => {
+  return [`/api/agent/projects/${projectId}/db-schema`] as const;
+};
+
+export const getGetDbSchemaQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDbSchema>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDbSchema>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDbSchemaQueryKey(projectId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getDbSchema>>> = ({
+    signal,
+  }) => getDbSchema(projectId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!projectId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDbSchema>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDbSchemaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDbSchema>>
+>;
+export type GetDbSchemaQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the extracted DB schema for a project
+ */
+
+export function useGetDbSchema<
+  TData = Awaited<ReturnType<typeof getDbSchema>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDbSchema>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDbSchemaQueryOptions(projectId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
