@@ -4,10 +4,11 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FolderGit2, FileText, Activity, Server, Clock, GitBranch, TerminalSquare, Search } from "lucide-react";
+import { FolderGit2, FileText, Activity, Server, Clock, GitBranch, TerminalSquare, Search, ChevronLeft } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
 function getMethodColor(method: string) {
   switch (method.toUpperCase()) {
@@ -22,6 +23,7 @@ function getMethodColor(method: string) {
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
 
   const { data: project, isLoading: loadingProject } = useGetProject(id!);
   const { data: apisData, isLoading: loadingApis } = useListApis(id!);
@@ -51,6 +53,14 @@ export function ProjectDetail() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      <button
+        onClick={() => setLocation("/projects")}
+        className="flex items-center gap-1 font-mono text-xs uppercase text-muted-foreground hover:text-primary transition-colors"
+        data-testid="button-back"
+      >
+        <ChevronLeft className="w-3.5 h-3.5" />
+        Project List
+      </button>
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
