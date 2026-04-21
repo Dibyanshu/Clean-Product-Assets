@@ -17,6 +17,7 @@
     "@fastify/sensible": "^6.0.4",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/integrations-openai-ai-server": "workspace:*",
     "drizzle-orm": "catalog:",
     "fastify": "^5.8.5",
     "fastify-plugin": "^5.1.0",

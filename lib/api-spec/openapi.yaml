@@ -24,6 +24,8 @@ tags:
     description: Semantic vector search across code and schema
   - name: lineage
     description: API ↔ DB lineage mapping agent
+  - name: lineage-ai
+    description: LLM-enhanced lineage via RAG (Retrieval-Augmented Generation)
 
 paths:
   /healthz:
@@ -373,6 +375,91 @@ paths:
                 $ref: "#/components/schemas/LineageResponse"
         "400":
           description: Missing projectId parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/lineage-ai:
+    post:
+      operationId: enhanceLineageAI
+      tags: [lineage-ai]
+      summary: Enhance single API lineage using RAG + LLM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnhanceLineageAIRequest"
+      responses:
+        "200":
+          description: AI-enhanced lineage result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AILineageResult"
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: LLM or processing error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/lineage-ai/bulk:
+    post:
+      operationId: enhanceLineageAIBulk
+      tags: [lineage-ai]
+      summary: Enhance lineage for all APIs in a project using RAG + LLM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkEnhanceLineageAIRequest"
+      responses:
+        "200":
+          description: Bulk AI-enhanced lineage result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkAILineageResult"
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/lineage-ai/refresh:
+    post:
+      operationId: refreshLineageAICache
+      tags: [lineage-ai]
+      summary: Clear LLM response cache for a project and force re-generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkEnhanceLineageAIRequest"
+      responses:
+        "200":
+          description: Cache cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  evicted:
+                    type: integer
+                required: [evicted]
+        "400":
+          description: Missing projectId
           content:
             application/json:
               schema:
@@ -796,6 +883,15 @@ components:
           enum: [SELECT, INSERT, UPDATE, DELETE, QUERY]
         confidence:
           type: number
+        source:
+          type: string
+          enum: [deterministic, llm, merged]
+        confidence_level:
+          type: string
+          enum: [high, medium, low, conflict]
+        prompt_version:
+          type: string
+          nullable: true
       required: [name, operation, confidence]
 
     LineageApiRef:
@@ -848,3 +944,82 @@ components:
           items:
             $ref: "#/components/schemas/LineageEntry"
       required: [projectId, apiCount, mappedCount, partialCount, unknownCount, entries]
+
+    EnhanceLineageAIRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+        apiId:
+          type: string
+      required: [projectId, apiId]
+
+    BulkEnhanceLineageAIRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+      required: [projectId]
+
+    AITableRef:
+      type: object
+      properties:
+        name:
+          type: string
+        operation:
+          type: string
+          enum: [SELECT, INSERT, UPDATE, DELETE, QUERY]
+        confidence:
+          type: string
+          enum: [high, medium, low, conflict]
+        source:
+          type: string
+          enum: [deterministic, llm, merged]
+        prompt_version:
+          type: string
+      required: [name, operation, confidence, source, prompt_version]
+
+    AILineageResult:
+      type: object
+      properties:
+        api:
+          type: string
+        apiId:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/AITableRef"
+        flow:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          enum: [deterministic, llm, merged]
+        promptVersion:
+          type: string
+        cached:
+          type: boolean
+      required: [api, apiId, method, path, tables, flow, source, promptVersion, cached]
+
+    BulkAILineageResult:
+      type: object
+      properties:
+        projectId:
+          type: string
+        processed:
+          type: integer
+        enhanced:
+          type: integer
+        fallback:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/AILineageResult"
+      required: [projectId, processed, enhanced, fallback, results]

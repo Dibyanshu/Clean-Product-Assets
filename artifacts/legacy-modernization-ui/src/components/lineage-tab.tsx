@@ -1,9 +1,26 @@
 import { useState } from "react";
-import { useGetLineage, useGenerateLineage } from "@workspace/api-client-react";
+import {
+  useGetLineage,
+  useGenerateLineage,
+  useEnhanceLineageAI,
+  useEnhanceLineageAIBulk,
+  useRefreshLineageAICache,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { GitMerge, RefreshCw, ChevronRight, Database, AlertTriangle, CheckCircle2, HelpCircle } from "lucide-react";
+import {
+  GitMerge,
+  RefreshCw,
+  ChevronRight,
+  Database,
+  AlertTriangle,
+  CheckCircle2,
+  HelpCircle,
+  Sparkles,
+  Trash2,
+  BrainCircuit,
+} from "lucide-react";
 
 function getMethodColor(method: string) {
   switch (method.toUpperCase()) {
@@ -24,6 +41,44 @@ function getOperationColor(op: string) {
     case "DELETE": return "text-red-400 bg-red-400/10 border-red-400/20";
     default:       return "text-muted-foreground bg-muted/10 border-muted/20";
   }
+}
+
+function getConfidenceLevelColor(level: string | undefined) {
+  switch ((level ?? "").toLowerCase()) {
+    case "high":     return "text-emerald-500 bg-emerald-500/10 border-emerald-500/30";
+    case "medium":   return "text-amber-400 bg-amber-400/10 border-amber-400/30";
+    case "low":      return "text-orange-400 bg-orange-400/10 border-orange-400/30";
+    case "conflict": return "text-red-500 bg-red-500/10 border-red-500/30";
+    default:         return "text-muted-foreground bg-muted/10 border-border/30";
+  }
+}
+
+function getSourceColor(source: string | undefined) {
+  switch ((source ?? "").toLowerCase()) {
+    case "merged":        return "text-violet-400 bg-violet-400/10 border-violet-400/30";
+    case "llm":           return "text-sky-400 bg-sky-400/10 border-sky-400/30";
+    case "deterministic": return "text-muted-foreground bg-muted/10 border-border/30";
+    default:              return "text-muted-foreground bg-muted/10 border-border/30";
+  }
+}
+
+function SourceLabel({ source }: { source: string | undefined }) {
+  if (!source || source === "deterministic") return null;
+  const label = source === "llm" ? "AI" : source === "merged" ? "AI+AST" : source;
+  return (
+    <span className={cn("font-mono text-[9px] tracking-widest uppercase border px-1.5 py-0.5", getSourceColor(source))}>
+      {label}
+    </span>
+  );
+}
+
+function ConfidenceLevelBadge({ level }: { level: string | undefined }) {
+  if (!level) return null;
+  return (
+    <span className={cn("font-mono text-[9px] tracking-widest uppercase border px-1.5 py-0.5", getConfidenceLevelColor(level))}>
+      {level}
+    </span>
+  );
 }
 
 function ConfidenceDot({ confidence }: { confidence: number }) {
@@ -52,6 +107,9 @@ interface Props {
 
 export function LineageTab({ projectId }: Props) {
   const [hasTriggered, setHasTriggered] = useState(false);
+  const [enhancingIds, setEnhancingIds] = useState<Set<string>>(new Set());
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
+
   const { data, isLoading, refetch } = useGetLineage({ projectId }, { enabled: true });
   const { mutate: generate, isPending: isGenerating } = useGenerateLineage({
     mutation: {
@@ -62,17 +120,51 @@ export function LineageTab({ projectId }: Props) {
     },
   });
 
+  const { mutate: enhanceSingle } = useEnhanceLineageAI({
+    mutation: {
+      onSuccess: () => void refetch(),
+      onSettled: (_data, _err, vars) => {
+        setEnhancingIds((prev) => {
+          const next = new Set(prev);
+          next.delete((vars.data as { apiId?: string }).apiId ?? "");
+          return next;
+        });
+      },
+    },
+  });
+
+  const { mutate: enhanceBulk, isPending: isBulking } = useEnhanceLineageAIBulk({
+    mutation: {
+      onSuccess: (result) => {
+        setBulkMsg(`Enhanced ${result.enhanced}/${result.processed} APIs`);
+        void refetch();
+        setTimeout(() => setBulkMsg(null), 4000);
+      },
+    },
+  });
+
+  const { mutate: refreshCache, isPending: isRefreshing } = useRefreshLineageAICache({
+    mutation: {
+      onSuccess: (result) => {
+        setBulkMsg(`Cache cleared — ${result.evicted} entries evicted`);
+        setTimeout(() => setBulkMsg(null), 3000);
+      },
+    },
+  });
+
   const hasData = data && data.entries.length > 0;
   const isEmpty = !isLoading && !hasData;
+  const isBusy = isGenerating || isBulking || isRefreshing;
 
-  const handleGenerate = () => {
-    generate({ data: { projectId } });
+  const handleEnhanceSingle = (apiId: string) => {
+    setEnhancingIds((prev) => new Set(prev).add(apiId));
+    enhanceSingle({ data: { projectId, apiId } });
   };
 
   return (
     <div className="space-y-4">
       {/* Header bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
           {hasData && (
             <div className="flex items-center gap-4 font-mono text-xs text-muted-foreground">
@@ -92,20 +184,59 @@ export function LineageTab({ projectId }: Props) {
               )}
             </div>
           )}
-        </div>
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 font-mono text-xs uppercase tracking-wider border transition-all",
-            isGenerating
-              ? "border-border/30 text-muted-foreground cursor-not-allowed"
-              : "border-primary/40 text-primary hover:bg-primary/10 hover:border-primary cursor-pointer",
+          {bulkMsg && (
+            <span className="font-mono text-[10px] text-emerald-400 border border-emerald-400/20 px-2 py-1">
+              {bulkMsg}
+            </span>
           )}
-        >
-          <RefreshCw className={cn("w-3 h-3", isGenerating && "animate-spin")} />
-          {isGenerating ? "Mapping lineage..." : hasData ? "Re-run Lineage" : "Generate Lineage"}
-        </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {hasData && (
+            <>
+              <button
+                onClick={() => refreshCache({ data: { projectId } })}
+                disabled={isBusy}
+                title="Clear AI response cache and force re-generation on next enhance"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider border transition-all",
+                  isBusy
+                    ? "border-border/30 text-muted-foreground cursor-not-allowed"
+                    : "border-border/40 text-muted-foreground hover:text-foreground hover:border-border cursor-pointer",
+                )}
+              >
+                <Trash2 className={cn("w-3 h-3", isRefreshing && "animate-spin")} />
+                {isRefreshing ? "Clearing..." : "Refresh Cache"}
+              </button>
+              <button
+                onClick={() => enhanceBulk({ data: { projectId } })}
+                disabled={isBusy}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider border transition-all",
+                  isBusy
+                    ? "border-border/30 text-muted-foreground cursor-not-allowed"
+                    : "border-violet-500/40 text-violet-400 hover:bg-violet-500/10 hover:border-violet-500 cursor-pointer",
+                )}
+              >
+                <BrainCircuit className={cn("w-3 h-3", isBulking && "animate-pulse")} />
+                {isBulking ? "Enhancing all..." : "Bulk AI Enhance"}
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => generate({ data: { projectId } })}
+            disabled={isBusy}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 font-mono text-xs uppercase tracking-wider border transition-all",
+              isBusy
+                ? "border-border/30 text-muted-foreground cursor-not-allowed"
+                : "border-primary/40 text-primary hover:bg-primary/10 hover:border-primary cursor-pointer",
+            )}
+          >
+            <RefreshCw className={cn("w-3 h-3", isGenerating && "animate-spin")} />
+            {isGenerating ? "Mapping lineage..." : hasData ? "Re-run Lineage" : "Generate Lineage"}
+          </button>
+        </div>
       </div>
 
       {/* Loading */}
@@ -130,90 +261,135 @@ export function LineageTab({ projectId }: Props) {
       {/* Lineage cards */}
       {hasData && !isGenerating && (
         <div className="grid gap-3">
-          {data.entries.map((entry) => (
-            <Card
-              key={entry.api.id}
-              className={cn(
-                "border rounded-none transition-colors",
-                entry.status === "mapped"  && "border-emerald-500/20 bg-emerald-500/[0.03]",
-                entry.status === "partial" && "border-amber-400/20 bg-amber-400/[0.03]",
-                entry.status === "unknown" && "border-border/40 bg-card/40",
-              )}
-            >
-              <CardHeader className="pb-3 pt-4 px-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Badge
-                      variant="outline"
-                      className={cn("rounded-none font-mono text-[10px] tracking-wider uppercase border px-2", getMethodColor(entry.api.method))}
-                    >
-                      {entry.api.method}
-                    </Badge>
-                    <CardTitle className="font-mono text-sm text-foreground">{entry.api.path}</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={entry.status} />
-                    <span className="font-mono text-[10px] uppercase text-muted-foreground">{entry.status}</span>
-                  </div>
-                </div>
-                {entry.api.handler && (
-                  <div className="font-mono text-[10px] text-muted-foreground/60 ml-0.5">{entry.api.handler}</div>
+          {data.entries.map((entry) => {
+            const isEnhancing = enhancingIds.has(entry.api.id);
+            const hasAITables = entry.tables.some(
+              (t) => t.source === "llm" || t.source === "merged",
+            );
+            return (
+              <Card
+                key={entry.api.id}
+                className={cn(
+                  "border rounded-none transition-colors",
+                  entry.status === "mapped"  && "border-emerald-500/20 bg-emerald-500/[0.03]",
+                  entry.status === "partial" && "border-amber-400/20 bg-amber-400/[0.03]",
+                  entry.status === "unknown" && "border-border/40 bg-card/40",
+                  isEnhancing && "border-violet-500/30 bg-violet-500/[0.03]",
                 )}
-              </CardHeader>
-
-              <CardContent className="px-5 pb-4 space-y-4">
-                {/* Flow chain */}
-                {entry.flow.length > 0 && (
-                  <div>
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mb-2">Flow</div>
-                    <div className="flex flex-wrap items-center gap-1">
-                      {entry.flow.map((step, i) => (
-                        <span key={i} className="flex items-center gap-1">
-                          <span className="font-mono text-xs bg-muted/20 border border-border/30 px-2 py-0.5 text-foreground/80">
-                            {step}
-                          </span>
-                          {i < entry.flow.length - 1 && (
-                            <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-                          )}
+              >
+                <CardHeader className="pb-3 pt-4 px-5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <Badge
+                        variant="outline"
+                        className={cn("rounded-none font-mono text-[10px] tracking-wider uppercase border px-2", getMethodColor(entry.api.method))}
+                      >
+                        {entry.api.method}
+                      </Badge>
+                      <CardTitle className="font-mono text-sm text-foreground">{entry.api.path}</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasAITables && (
+                        <span className="flex items-center gap-1 font-mono text-[9px] text-violet-400 uppercase border border-violet-400/20 px-1.5 py-0.5">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          AI enhanced
                         </span>
-                      ))}
+                      )}
+                      <StatusIcon status={entry.status} />
+                      <span className="font-mono text-[10px] uppercase text-muted-foreground">{entry.status}</span>
+                      <button
+                        onClick={() => handleEnhanceSingle(entry.api.id)}
+                        disabled={isBusy || isEnhancing}
+                        title="Enhance this mapping using RAG + LLM"
+                        className={cn(
+                          "flex items-center gap-1 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider border transition-all",
+                          isEnhancing
+                            ? "border-violet-500/30 text-violet-400 cursor-wait animate-pulse"
+                            : isBusy
+                              ? "border-border/20 text-muted-foreground/40 cursor-not-allowed"
+                              : "border-violet-500/30 text-violet-400/70 hover:text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/60 cursor-pointer",
+                        )}
+                      >
+                        <Sparkles className="w-2.5 h-2.5" />
+                        {isEnhancing ? "Enhancing..." : "Enhance with AI"}
+                      </button>
                     </div>
                   </div>
-                )}
+                  {entry.api.handler && (
+                    <div className="font-mono text-[10px] text-muted-foreground/60 ml-0.5">{entry.api.handler}</div>
+                  )}
+                </CardHeader>
 
-                {/* Tables */}
-                {entry.tables.length > 0 ? (
-                  <div>
-                    <div className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mb-2">
-                      Tables ({entry.tables.length})
+                <CardContent className="px-5 pb-4 space-y-4">
+                  {/* Flow chain */}
+                  {entry.flow.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mb-2">Flow</div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {entry.flow.map((step, i) => (
+                          <span key={i} className="flex items-center gap-1">
+                            <span className="font-mono text-xs bg-muted/20 border border-border/30 px-2 py-0.5 text-foreground/80">
+                              {step}
+                            </span>
+                            {i < entry.flow.length - 1 && (
+                              <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
+                            )}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {entry.tables.map((t, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 bg-muted/10 border border-border/30 px-2.5 py-1.5"
-                        >
-                          <Database className="w-3 h-3 text-muted-foreground/60 flex-shrink-0" />
-                          <span className="font-mono text-xs text-foreground">{t.name}</span>
-                          <Badge
-                            variant="outline"
-                            className={cn("rounded-none font-mono text-[9px] tracking-widest uppercase border px-1.5 py-0", getOperationColor(t.operation))}
+                  )}
+
+                  {/* Tables */}
+                  {entry.tables.length > 0 ? (
+                    <div>
+                      <div className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mb-2">
+                        Tables ({entry.tables.length})
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {entry.tables.map((t, i) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "flex items-center gap-2 border px-2.5 py-1.5",
+                              t.confidence_level === "conflict"
+                                ? "bg-red-500/[0.04] border-red-500/20"
+                                : t.source === "llm"
+                                  ? "bg-sky-500/[0.04] border-sky-400/20"
+                                  : t.source === "merged"
+                                    ? "bg-violet-500/[0.04] border-violet-400/20"
+                                    : "bg-muted/10 border-border/30",
+                            )}
                           >
-                            {t.operation}
-                          </Badge>
-                          <ConfidenceDot confidence={t.confidence} />
-                        </div>
-                      ))}
+                            <Database className="w-3 h-3 text-muted-foreground/60 flex-shrink-0" />
+                            <span className="font-mono text-xs text-foreground">{t.name}</span>
+                            <Badge
+                              variant="outline"
+                              className={cn("rounded-none font-mono text-[9px] tracking-widest uppercase border px-1.5 py-0", getOperationColor(t.operation))}
+                            >
+                              {t.operation}
+                            </Badge>
+                            <ConfidenceDot confidence={t.confidence} />
+                            <ConfidenceLevelBadge level={t.confidence_level} />
+                            <SourceLabel source={t.source} />
+                            {t.prompt_version && (
+                              <span className="font-mono text-[9px] text-muted-foreground/40">
+                                {t.prompt_version}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-[10px] font-mono text-muted-foreground/50 italic">
-                    No table mappings detected
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  ) : (
+                    <div className="text-[10px] font-mono text-muted-foreground/50 italic">
+                      No table mappings detected
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

@@ -6,6 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./aILineageResult";
+export * from "./aILineageResultSource";
+export * from "./aITableRef";
+export * from "./aITableRefConfidence";
+export * from "./aITableRefOperation";
+export * from "./aITableRefSource";
 export * from "./analyzeRequest";
 export * from "./analyzeResponse";
 export * from "./apiRoute";
@@ -13,11 +19,14 @@ export * from "./astChunkItem";
 export * from "./astChunkMetadata";
 export * from "./astTestRequest";
 export * from "./astTestResponse";
+export * from "./bulkAILineageResult";
+export * from "./bulkEnhanceLineageAIRequest";
 export * from "./dbColumn";
 export * from "./dbFunction";
 export * from "./dbSchemaResult";
 export * from "./dbTable";
 export * from "./document";
+export * from "./enhanceLineageAIRequest";
 export * from "./errorResponse";
 export * from "./extractDbSchemaRequest";
 export * from "./extractDbSchemaResponse";
@@ -35,12 +44,15 @@ export * from "./lineageEntry";
 export * from "./lineageEntryStatus";
 export * from "./lineageResponse";
 export * from "./lineageTableRef";
+export * from "./lineageTableRefConfidenceLevel";
 export * from "./lineageTableRefOperation";
+export * from "./lineageTableRefSource";
 export * from "./listApis200";
 export * from "./listDocuments200";
 export * from "./listJobs200";
 export * from "./listProjects200";
 export * from "./project";
+export * from "./refreshLineageAICache200";
 export * from "./searchResponse";
 export * from "./searchResultItem";
 export * from "./searchResultItemMetadata";

@@ -261,12 +261,97 @@ export const GetLineageResponse = zod.object({
             "QUERY",
           ]),
           confidence: zod.number(),
+          source: zod.enum(["deterministic", "llm", "merged"]).optional(),
+          confidence_level: zod
+            .enum(["high", "medium", "low", "conflict"])
+            .optional(),
+          prompt_version: zod.string().nullish(),
         }),
       ),
       flow: zod.array(zod.string()),
       status: zod.enum(["mapped", "partial", "unknown"]),
     }),
   ),
+});
+
+/**
+ * @summary Enhance single API lineage using RAG + LLM
+ */
+export const EnhanceLineageAIBody = zod.object({
+  projectId: zod.string(),
+  apiId: zod.string(),
+});
+
+export const EnhanceLineageAIResponse = zod.object({
+  api: zod.string(),
+  apiId: zod.string(),
+  method: zod.string(),
+  path: zod.string(),
+  tables: zod.array(
+    zod.object({
+      name: zod.string(),
+      operation: zod.enum(["SELECT", "INSERT", "UPDATE", "DELETE", "QUERY"]),
+      confidence: zod.enum(["high", "medium", "low", "conflict"]),
+      source: zod.enum(["deterministic", "llm", "merged"]),
+      prompt_version: zod.string(),
+    }),
+  ),
+  flow: zod.array(zod.string()),
+  source: zod.enum(["deterministic", "llm", "merged"]),
+  promptVersion: zod.string(),
+  cached: zod.boolean(),
+});
+
+/**
+ * @summary Enhance lineage for all APIs in a project using RAG + LLM
+ */
+export const EnhanceLineageAIBulkBody = zod.object({
+  projectId: zod.string(),
+});
+
+export const EnhanceLineageAIBulkResponse = zod.object({
+  projectId: zod.string(),
+  processed: zod.number(),
+  enhanced: zod.number(),
+  fallback: zod.number(),
+  results: zod.array(
+    zod.object({
+      api: zod.string(),
+      apiId: zod.string(),
+      method: zod.string(),
+      path: zod.string(),
+      tables: zod.array(
+        zod.object({
+          name: zod.string(),
+          operation: zod.enum([
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "QUERY",
+          ]),
+          confidence: zod.enum(["high", "medium", "low", "conflict"]),
+          source: zod.enum(["deterministic", "llm", "merged"]),
+          prompt_version: zod.string(),
+        }),
+      ),
+      flow: zod.array(zod.string()),
+      source: zod.enum(["deterministic", "llm", "merged"]),
+      promptVersion: zod.string(),
+      cached: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Clear LLM response cache for a project and force re-generation
+ */
+export const RefreshLineageAICacheBody = zod.object({
+  projectId: zod.string(),
+});
+
+export const RefreshLineageAICacheResponse = zod.object({
+  evicted: zod.number(),
 });
 
 /**

@@ -132,6 +132,9 @@ export async function runMigrations(): Promise<void> {
       table_name TEXT NOT NULL,
       operation TEXT NOT NULL,
       confidence REAL NOT NULL DEFAULT 1.0,
+      source TEXT NOT NULL DEFAULT 'deterministic',
+      confidence_level TEXT NOT NULL DEFAULT 'high',
+      prompt_version TEXT,
       FOREIGN KEY (project_id) REFERENCES projects(id),
       FOREIGN KEY (api_id) REFERENCES apis(id)
     )

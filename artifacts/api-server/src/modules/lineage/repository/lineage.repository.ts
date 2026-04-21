@@ -2,6 +2,8 @@ import { getDb, rowsToObjects } from "../../../db/sqlite.js";
 import { generateId } from "../../../utils/id.js";
 
 export type SqlOperation = "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "QUERY";
+export type LineageSource = "deterministic" | "llm" | "merged";
+export type ConfidenceLevel = "high" | "medium" | "low" | "conflict";
 
 export interface ApiFunctionMap {
   id: string;
@@ -27,6 +29,21 @@ export interface ApiTableMap {
   table_name: string;
   operation: SqlOperation;
   confidence: number;
+  source: LineageSource;
+  confidence_level: ConfidenceLevel;
+  prompt_version: string | null;
+}
+
+export interface InsertApiTableMapOptions {
+  source?: LineageSource;
+  confidence_level?: ConfidenceLevel;
+  prompt_version?: string | null;
+}
+
+export function confidenceLevelFromFloat(confidence: number): ConfidenceLevel {
+  if (confidence >= 0.85) return "high";
+  if (confidence >= 0.65) return "medium";
+  return "low";
 }
 
 export async function clearLineageForProject(projectId: string): Promise<void> {
@@ -34,6 +51,11 @@ export async function clearLineageForProject(projectId: string): Promise<void> {
   db.run("DELETE FROM api_function_map WHERE project_id = ?", [projectId] as unknown[]);
   db.run("DELETE FROM function_table_map WHERE project_id = ?", [projectId] as unknown[]);
   db.run("DELETE FROM api_table_map WHERE project_id = ?", [projectId] as unknown[]);
+}
+
+export async function clearApiTableMapForApi(projectId: string, apiId: string): Promise<void> {
+  const db = await getDb();
+  db.run("DELETE FROM api_table_map WHERE project_id = ? AND api_id = ?", [projectId, apiId] as unknown[]);
 }
 
 export async function insertApiFunctionMap(
@@ -73,14 +95,30 @@ export async function insertApiTableMap(
   tableName: string,
   operation: SqlOperation,
   confidence: number,
+  opts: InsertApiTableMapOptions = {},
 ): Promise<ApiTableMap> {
   const db = await getDb();
   const id = generateId();
+  const source: LineageSource = opts.source ?? "deterministic";
+  const confidence_level: ConfidenceLevel = opts.confidence_level ?? confidenceLevelFromFloat(confidence);
+  const prompt_version = opts.prompt_version ?? null;
   db.run(
-    "INSERT INTO api_table_map (id, project_id, api_id, table_name, operation, confidence) VALUES (?, ?, ?, ?, ?, ?)",
-    [id, projectId, apiId, tableName, operation, confidence] as unknown[],
+    `INSERT INTO api_table_map
+       (id, project_id, api_id, table_name, operation, confidence, source, confidence_level, prompt_version)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, projectId, apiId, tableName, operation, confidence, source, confidence_level, prompt_version] as unknown[],
   );
-  return { id, project_id: projectId, api_id: apiId, table_name: tableName, operation, confidence };
+  return {
+    id,
+    project_id: projectId,
+    api_id: apiId,
+    table_name: tableName,
+    operation,
+    confidence,
+    source,
+    confidence_level,
+    prompt_version,
+  };
 }
 
 export async function getApiFunctionMaps(projectId: string): Promise<ApiFunctionMap[]> {
@@ -98,5 +136,14 @@ export async function getFunctionTableMaps(projectId: string): Promise<FunctionT
 export async function getApiTableMaps(projectId: string): Promise<ApiTableMap[]> {
   const db = await getDb();
   const result = db.exec("SELECT * FROM api_table_map WHERE project_id = ? ORDER BY api_id", [projectId] as unknown[]);
+  return rowsToObjects(result) as unknown as ApiTableMap[];
+}
+
+export async function getApiTableMapsForApi(projectId: string, apiId: string): Promise<ApiTableMap[]> {
+  const db = await getDb();
+  const result = db.exec(
+    "SELECT * FROM api_table_map WHERE project_id = ? AND api_id = ? ORDER BY table_name",
+    [projectId, apiId] as unknown[],
+  );
   return rowsToObjects(result) as unknown as ApiTableMap[];
 }

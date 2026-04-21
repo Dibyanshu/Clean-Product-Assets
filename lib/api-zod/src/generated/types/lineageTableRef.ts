@@ -5,10 +5,15 @@
  * Agentic Legacy Modernization System API
  * OpenAPI spec version: 0.1.0
  */
+import type { LineageTableRefConfidenceLevel } from "./lineageTableRefConfidenceLevel";
 import type { LineageTableRefOperation } from "./lineageTableRefOperation";
+import type { LineageTableRefSource } from "./lineageTableRefSource";
 
 export interface LineageTableRef {
   name: string;
   operation: LineageTableRefOperation;
   confidence: number;
+  source?: LineageTableRefSource;
+  confidence_level?: LineageTableRefConfidenceLevel;
+  prompt_version?: string | null;
 }

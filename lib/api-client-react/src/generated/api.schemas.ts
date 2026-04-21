@@ -205,10 +205,32 @@ export const LineageTableRefOperation = {
   QUERY: "QUERY",
 } as const;
 
+export type LineageTableRefSource =
+  (typeof LineageTableRefSource)[keyof typeof LineageTableRefSource];
+
+export const LineageTableRefSource = {
+  deterministic: "deterministic",
+  llm: "llm",
+  merged: "merged",
+} as const;
+
+export type LineageTableRefConfidenceLevel =
+  (typeof LineageTableRefConfidenceLevel)[keyof typeof LineageTableRefConfidenceLevel];
+
+export const LineageTableRefConfidenceLevel = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+  conflict: "conflict",
+} as const;
+
 export interface LineageTableRef {
   name: string;
   operation: LineageTableRefOperation;
   confidence: number;
+  source?: LineageTableRefSource;
+  confidence_level?: LineageTableRefConfidenceLevel;
+  prompt_version?: string | null;
 }
 
 export interface LineageApiRef {
@@ -243,6 +265,82 @@ export interface LineageResponse {
   entries: LineageEntry[];
 }
 
+export interface EnhanceLineageAIRequest {
+  projectId: string;
+  apiId: string;
+}
+
+export interface BulkEnhanceLineageAIRequest {
+  projectId: string;
+}
+
+export type AITableRefOperation =
+  (typeof AITableRefOperation)[keyof typeof AITableRefOperation];
+
+export const AITableRefOperation = {
+  SELECT: "SELECT",
+  INSERT: "INSERT",
+  UPDATE: "UPDATE",
+  DELETE: "DELETE",
+  QUERY: "QUERY",
+} as const;
+
+export type AITableRefConfidence =
+  (typeof AITableRefConfidence)[keyof typeof AITableRefConfidence];
+
+export const AITableRefConfidence = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+  conflict: "conflict",
+} as const;
+
+export type AITableRefSource =
+  (typeof AITableRefSource)[keyof typeof AITableRefSource];
+
+export const AITableRefSource = {
+  deterministic: "deterministic",
+  llm: "llm",
+  merged: "merged",
+} as const;
+
+export interface AITableRef {
+  name: string;
+  operation: AITableRefOperation;
+  confidence: AITableRefConfidence;
+  source: AITableRefSource;
+  prompt_version: string;
+}
+
+export type AILineageResultSource =
+  (typeof AILineageResultSource)[keyof typeof AILineageResultSource];
+
+export const AILineageResultSource = {
+  deterministic: "deterministic",
+  llm: "llm",
+  merged: "merged",
+} as const;
+
+export interface AILineageResult {
+  api: string;
+  apiId: string;
+  method: string;
+  path: string;
+  tables: AITableRef[];
+  flow: string[];
+  source: AILineageResultSource;
+  promptVersion: string;
+  cached: boolean;
+}
+
+export interface BulkAILineageResult {
+  projectId: string;
+  processed: number;
+  enhanced: number;
+  fallback: number;
+  results: AILineageResult[];
+}
+
 export type ListProjects200 = {
   projects: Project[];
 };
@@ -264,6 +362,10 @@ export type GetLineageParams = {
    * Project ID
    */
   projectId: string;
+};
+
+export type RefreshLineageAICache200 = {
+  evicted: number;
 };
 
 export type SemanticSearchParams = {

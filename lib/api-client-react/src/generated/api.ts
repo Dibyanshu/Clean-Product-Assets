@@ -17,11 +17,15 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AILineageResult,
   AnalyzeRequest,
   AnalyzeResponse,
   AstTestRequest,
   AstTestResponse,
+  BulkAILineageResult,
+  BulkEnhanceLineageAIRequest,
   DbSchemaResult,
+  EnhanceLineageAIRequest,
   ErrorResponse,
   ExtractDbSchemaRequest,
   ExtractDbSchemaResponse,
@@ -39,6 +43,7 @@ import type {
   ListJobs200,
   ListProjects200,
   Project,
+  RefreshLineageAICache200,
   SearchResponse,
   SemanticSearchParams,
 } from "./api.schemas";
@@ -1298,6 +1303,266 @@ export function useGetLineage<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Enhance single API lineage using RAG + LLM
+ */
+export const getEnhanceLineageAIUrl = () => {
+  return `/api/agent/lineage-ai`;
+};
+
+export const enhanceLineageAI = async (
+  enhanceLineageAIRequest: EnhanceLineageAIRequest,
+  options?: RequestInit,
+): Promise<AILineageResult> => {
+  return customFetch<AILineageResult>(getEnhanceLineageAIUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(enhanceLineageAIRequest),
+  });
+};
+
+export const getEnhanceLineageAIMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enhanceLineageAI>>,
+    TError,
+    { data: BodyType<EnhanceLineageAIRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof enhanceLineageAI>>,
+  TError,
+  { data: BodyType<EnhanceLineageAIRequest> },
+  TContext
+> => {
+  const mutationKey = ["enhanceLineageAI"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof enhanceLineageAI>>,
+    { data: BodyType<EnhanceLineageAIRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return enhanceLineageAI(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EnhanceLineageAIMutationResult = NonNullable<
+  Awaited<ReturnType<typeof enhanceLineageAI>>
+>;
+export type EnhanceLineageAIMutationBody = BodyType<EnhanceLineageAIRequest>;
+export type EnhanceLineageAIMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Enhance single API lineage using RAG + LLM
+ */
+export const useEnhanceLineageAI = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enhanceLineageAI>>,
+    TError,
+    { data: BodyType<EnhanceLineageAIRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof enhanceLineageAI>>,
+  TError,
+  { data: BodyType<EnhanceLineageAIRequest> },
+  TContext
+> => {
+  return useMutation(getEnhanceLineageAIMutationOptions(options));
+};
+
+/**
+ * @summary Enhance lineage for all APIs in a project using RAG + LLM
+ */
+export const getEnhanceLineageAIBulkUrl = () => {
+  return `/api/agent/lineage-ai/bulk`;
+};
+
+export const enhanceLineageAIBulk = async (
+  bulkEnhanceLineageAIRequest: BulkEnhanceLineageAIRequest,
+  options?: RequestInit,
+): Promise<BulkAILineageResult> => {
+  return customFetch<BulkAILineageResult>(getEnhanceLineageAIBulkUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkEnhanceLineageAIRequest),
+  });
+};
+
+export const getEnhanceLineageAIBulkMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enhanceLineageAIBulk>>,
+    TError,
+    { data: BodyType<BulkEnhanceLineageAIRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof enhanceLineageAIBulk>>,
+  TError,
+  { data: BodyType<BulkEnhanceLineageAIRequest> },
+  TContext
+> => {
+  const mutationKey = ["enhanceLineageAIBulk"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof enhanceLineageAIBulk>>,
+    { data: BodyType<BulkEnhanceLineageAIRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return enhanceLineageAIBulk(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EnhanceLineageAIBulkMutationResult = NonNullable<
+  Awaited<ReturnType<typeof enhanceLineageAIBulk>>
+>;
+export type EnhanceLineageAIBulkMutationBody =
+  BodyType<BulkEnhanceLineageAIRequest>;
+export type EnhanceLineageAIBulkMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Enhance lineage for all APIs in a project using RAG + LLM
+ */
+export const useEnhanceLineageAIBulk = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enhanceLineageAIBulk>>,
+    TError,
+    { data: BodyType<BulkEnhanceLineageAIRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof enhanceLineageAIBulk>>,
+  TError,
+  { data: BodyType<BulkEnhanceLineageAIRequest> },
+  TContext
+> => {
+  return useMutation(getEnhanceLineageAIBulkMutationOptions(options));
+};
+
+/**
+ * @summary Clear LLM response cache for a project and force re-generation
+ */
+export const getRefreshLineageAICacheUrl = () => {
+  return `/api/agent/lineage-ai/refresh`;
+};
+
+export const refreshLineageAICache = async (
+  bulkEnhanceLineageAIRequest: BulkEnhanceLineageAIRequest,
+  options?: RequestInit,
+): Promise<RefreshLineageAICache200> => {
+  return customFetch<RefreshLineageAICache200>(getRefreshLineageAICacheUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkEnhanceLineageAIRequest),
+  });
+};
+
+export const getRefreshLineageAICacheMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshLineageAICache>>,
+    TError,
+    { data: BodyType<BulkEnhanceLineageAIRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof refreshLineageAICache>>,
+  TError,
+  { data: BodyType<BulkEnhanceLineageAIRequest> },
+  TContext
+> => {
+  const mutationKey = ["refreshLineageAICache"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof refreshLineageAICache>>,
+    { data: BodyType<BulkEnhanceLineageAIRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return refreshLineageAICache(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RefreshLineageAICacheMutationResult = NonNullable<
+  Awaited<ReturnType<typeof refreshLineageAICache>>
+>;
+export type RefreshLineageAICacheMutationBody =
+  BodyType<BulkEnhanceLineageAIRequest>;
+export type RefreshLineageAICacheMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Clear LLM response cache for a project and force re-generation
+ */
+export const useRefreshLineageAICache = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshLineageAICache>>,
+    TError,
+    { data: BodyType<BulkEnhanceLineageAIRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof refreshLineageAICache>>,
+  TError,
+  { data: BodyType<BulkEnhanceLineageAIRequest> },
+  TContext
+> => {
+  return useMutation(getRefreshLineageAICacheMutationOptions(options));
+};
 
 /**
  * @summary Semantic vector search over indexed code and schema

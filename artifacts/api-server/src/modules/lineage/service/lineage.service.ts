@@ -10,6 +10,9 @@ export interface LineageTableRef {
   name: string;
   operation: SqlOperation;
   confidence: number;
+  source?: "deterministic" | "llm" | "merged";
+  confidence_level?: "high" | "medium" | "low" | "conflict";
+  prompt_version?: string | null;
 }
 
 export interface LineageEntry {
@@ -286,8 +289,19 @@ export async function generateLineage(projectId: string): Promise<LineageResult>
     const tables: LineageTableRef[] = [];
     for (const [key, { operation, confidence }] of tableRefs.entries()) {
       const tableName = key.split("::")[0]!;
-      await lineageRepo.insertApiTableMap(projectId, api.id, tableName, operation, confidence);
-      tables.push({ name: tableName, operation, confidence });
+      await lineageRepo.insertApiTableMap(projectId, api.id, tableName, operation, confidence, {
+        source: "deterministic",
+        confidence_level: lineageRepo.confidenceLevelFromFloat(confidence),
+        prompt_version: null,
+      });
+      tables.push({
+        name: tableName,
+        operation,
+        confidence,
+        source: "deterministic",
+        confidence_level: lineageRepo.confidenceLevelFromFloat(confidence),
+        prompt_version: null,
+      });
     }
 
     const avgConf = tables.length > 0 ? tables.reduce((s, t) => s + t.confidence, 0) / tables.length : 0;
@@ -336,6 +350,9 @@ export async function getLineage(projectId: string): Promise<LineageResult | nul
       name: t.table_name,
       operation: t.operation as SqlOperation,
       confidence: t.confidence,
+      source: (t.source as "deterministic" | "llm" | "merged") ?? "deterministic",
+      confidence_level: (t.confidence_level as "high" | "medium" | "low" | "conflict") ?? lineageRepo.confidenceLevelFromFloat(t.confidence),
+      prompt_version: t.prompt_version ?? null,
     }));
 
     const avgConf = tables.length > 0 ? tables.reduce((s, t) => s + t.confidence, 0) / tables.length : 0;

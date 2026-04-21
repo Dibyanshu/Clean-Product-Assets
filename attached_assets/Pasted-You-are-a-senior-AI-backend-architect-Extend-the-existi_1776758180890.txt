@@ -1,0 +1,323 @@
+You are a senior AI/backend architect. Extend the existing Fastify-based Node.js system to implement **LLM-enhanced API ↔ DB lineage mapping using RAG (Retrieval-Augmented Generation)**.
+
+This MUST enhance the existing deterministic lineage system using ChromaDB + LLM reasoning and include robust validation, caching, and observability.
+
+---
+
+# 🎯 OBJECTIVE
+
+Improve lineage accuracy by:
+
+1. Retrieving relevant code + schema from Chroma
+2. Sending structured context to LLM
+3. Inferring API → Function → DB table relationships
+4. Merging results with deterministic lineage
+5. Ensuring reliability, repeatability, and traceability
+
+---
+
+# 🧱 ARCHITECTURE ADDITION
+
+Create:
+
+/modules/lineage-ai
+lineageAI.service.ts
+lineageAI.controller.ts
+
+/services
+llm.service.ts
+prompt.service.ts
+cache.service.ts
+
+---
+
+# ⚙️ LLM SETUP (MANDATORY)
+
+Use OpenAI (or compatible API)
+
+### llm.service.ts
+
+Function:
+
+```ts
+generate(prompt: string): Promise<string>
+```
+
+### REQUIRED FEATURES
+
+* Retry mechanism (max 3 retries)
+* Timeout handling
+* Structured logging for each request
+* Response size guard
+
+---
+
+# 🧠 PROMPT MANAGEMENT (MANDATORY)
+
+Create:
+
+/services/prompt.service.ts
+
+Responsibilities:
+
+* Store prompt templates
+* Version prompts
+
+Each prompt must include:
+
+* version
+* name
+* template
+
+---
+
+# 🧠 RAG FLOW
+
+## Step 1: Input
+
+* API endpoint (route + method)
+* Existing deterministic lineage
+
+---
+
+## Step 2: Retrieve Context (Chroma)
+
+Query using:
+
+* API route
+* function names
+* domain keywords
+
+### REQUIREMENTS
+
+* Limit results (top 5–10 chunks)
+* Deduplicate chunks
+* Log retrieved sources
+
+---
+
+## Step 3: Build Prompt (MANDATORY STRUCTURE)
+
+Use prompt.service
+
+Template:
+
+```text
+You are a senior software architect.
+
+Given the following API and system context, identify:
+
+1. Database tables used
+2. Operations (SELECT, INSERT, UPDATE, DELETE)
+3. Execution flow (function chain)
+
+API:
+{api}
+
+Code Context:
+{chunks}
+
+Database Schema:
+{schema}
+
+Return STRICT JSON:
+{
+  "tables": [
+    { "name": "string", "operation": "string" }
+  ],
+  "flow": ["string"]
+}
+```
+
+---
+
+## Step 4: LLM CALL (WITH RETRY)
+
+* Retry up to 3 times if:
+
+  * invalid JSON
+  * empty response
+* Log each attempt
+
+---
+
+## Step 5: VALIDATE OUTPUT (MANDATORY)
+
+* Strict JSON parsing
+* Reject malformed output
+* Normalize:
+
+  * table names (lowercase)
+  * operations (uppercase)
+
+Fallback:
+
+* If LLM fails → return deterministic result
+
+---
+
+## Step 6: MERGE RESULTS
+
+Combine:
+
+* deterministic lineage
+* LLM inference
+
+### RULES
+
+* Match → confidence = HIGH
+* LLM-only → confidence = LOW
+* Conflict → mark as CONFLICT
+
+---
+
+## Step 7: CACHE RESULTS (MANDATORY)
+
+Use:
+
+/services/cache.service.ts
+
+Cache key:
+
+```ts
+projectId + apiId + promptVersion
+```
+
+Behavior:
+
+* Return cached result if exists
+* Store LLM output after success
+
+---
+
+## Step 8: STORE RESULTS
+
+Extend table:
+
+api_table_map
+
+Add fields:
+
+* source (deterministic | llm | merged)
+* confidence (high | medium | low | conflict)
+* prompt_version
+
+---
+
+# 🔌 API ENDPOINTS
+
+## 1. Enhance Lineage
+
+POST /agent/lineage-ai
+
+Input:
+
+```json
+{
+  "projectId": "string",
+  "apiId": "string"
+}
+```
+
+---
+
+## 2. Bulk Enhancement
+
+POST /agent/lineage-ai/bulk
+
+* Runs for all APIs
+
+---
+
+## 3. Cache Control (MANDATORY)
+
+POST /agent/lineage-ai/refresh
+
+* Clears cache and regenerates
+
+---
+
+# 📦 RESPONSE FORMAT
+
+```json
+{
+  "api": "/orders",
+  "tables": [
+    {
+      "name": "orders",
+      "operation": "INSERT",
+      "confidence": "high"
+    }
+  ],
+  "flow": [
+    "OrderController.create",
+    "OrderService.create"
+  ],
+  "source": "merged",
+  "promptVersion": "v1"
+}
+```
+
+---
+
+# 🖥️ FRONTEND REQUIREMENTS
+
+In LINEAGE tab:
+
+### MUST DISPLAY
+
+* Tables
+* Operations
+* Flow
+* Confidence level
+* Source (AST / LLM / merged)
+* Prompt version
+
+---
+
+### ADD BUTTONS
+
+* “Enhance with AI”
+* “Re-run Analysis”
+* “Refresh Cache”
+
+---
+
+# ⚠️ STRICT RULES
+
+* NEVER send full repo to LLM
+* ALWAYS use Chroma retrieval
+* ALWAYS validate JSON before use
+* DO NOT override deterministic data blindly
+* KEEP all logic inside service layer
+
+---
+
+# 📈 SUCCESS CRITERIA
+
+* LLM improves missing lineage links
+* Invalid responses are handled safely
+* Cached responses reduce repeated calls
+* Prompt versioning works
+* UI reflects confidence and source clearly
+
+---
+
+# 🧪 LOGGING (MANDATORY)
+
+Log:
+
+* prompt version
+* retrieved chunk count
+* LLM attempts
+* validation errors
+* cache hits/misses
+
+---
+
+# EXPLAIN
+
+1. How RAG improves lineage accuracy
+2. How prompt versioning works
+3. How caching reduces cost
+4. Failure handling strategy
