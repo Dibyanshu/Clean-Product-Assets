@@ -1,4 +1,4 @@
-import { type Request, type Response } from "express";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import * as analysisService from "../service/analysis.service.js";
 import { createJob, updateJob } from "../../../utils/jobTracker.js";
@@ -7,17 +7,20 @@ const AnalyzeBodySchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
 });
 
-export async function analyzeHandler(req: Request, res: Response): Promise<void> {
-  const parsed = AnalyzeBodySchema.safeParse(req.body);
+export async function analyzeHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const parsed = AnalyzeBodySchema.safeParse(request.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
     return;
   }
 
   const { projectId } = parsed.data;
   const job = createJob("analysis", projectId);
 
-  req.log.info({ jobId: job.id, projectId }, "Analysis job started");
+  request.log.info({ jobId: job.id, projectId }, "[AnalysisAgent] Job started");
   updateJob(job.id, { status: "running", message: "Extracting API routes from files" });
 
   try {
@@ -29,7 +32,7 @@ export async function analyzeHandler(req: Request, res: Response): Promise<void>
       result,
     });
 
-    res.status(201).json({ jobId: job.id, ...result });
+    reply.code(201).send({ jobId: job.id, ...result });
   } catch (err) {
     updateJob(job.id, {
       status: "failed",
@@ -37,13 +40,16 @@ export async function analyzeHandler(req: Request, res: Response): Promise<void>
       completedAt: new Date().toISOString(),
       error: String(err),
     });
-    req.log.error({ err }, "Analysis failed");
-    res.status(500).json({ error: "Analysis failed", message: String(err) });
+    request.log.error({ err }, "[AnalysisAgent] Job failed");
+    reply.code(500).send({ error: "Analysis failed", message: String(err) });
   }
 }
 
-export async function listApisHandler(req: Request, res: Response): Promise<void> {
-  const { projectId } = req.params as { projectId: string };
+export async function listApisHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const { projectId } = request.params;
   const apis = await analysisService.getApisByProject(projectId);
-  res.json({ apis });
+  reply.send({ apis });
 }

@@ -10,7 +10,7 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **API framework**: Express 5 (clean architecture)
+- **API framework**: Fastify 5 (clean architecture, plugin-based)
 - **SQLite**: sql.js (pure JS, in-memory)
 - **Validation**: Zod
 - **Frontend**: React + Vite + Tailwind CSS + Shadcn UI
@@ -50,15 +50,21 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 
 ```
 artifacts/api-server/src/
-├── app.ts                     # Express app setup + DB init
-├── index.ts                   # Server entrypoint
+├── app.ts                     # Fastify app factory + plugin registration
+├── index.ts                   # Server entrypoint (fastify.listen)
+├── plugins/
+│   ├── cors.ts                # @fastify/cors plugin
+│   └── db.ts                  # DB init (runs migrations) plugin
 ├── db/sqlite.ts               # SQLite (sql.js) singleton
 ├── db/migrate.ts              # Schema migrations
 ├── modules/
 │   ├── ingestion/             # Agent 1
 │   ├── analysis/              # Agent 2
 │   └── prd/                   # Agent 3 + Mock LLM
-├── routes/agent.ts            # All agent routes
+├── routes/
+│   ├── index.ts               # Root route plugin (registers health + agent)
+│   ├── health.ts              # GET /healthz
+│   └── agent.ts               # All agent routes
 └── utils/jobTracker.ts        # In-memory job tracker
 
 artifacts/legacy-modernization-ui/

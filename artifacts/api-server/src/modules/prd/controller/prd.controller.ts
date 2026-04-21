@@ -1,4 +1,4 @@
-import { type Request, type Response } from "express";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import * as prdService from "../service/prd.service.js";
 import { createJob, updateJob } from "../../../utils/jobTracker.js";
@@ -7,17 +7,20 @@ const GeneratePRDBodySchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
 });
 
-export async function generatePRDHandler(req: Request, res: Response): Promise<void> {
-  const parsed = GeneratePRDBodySchema.safeParse(req.body);
+export async function generatePRDHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const parsed = GeneratePRDBodySchema.safeParse(request.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
     return;
   }
 
   const { projectId } = parsed.data;
   const job = createJob("prd-generator", projectId);
 
-  req.log.info({ jobId: job.id, projectId }, "PRD generation job started");
+  request.log.info({ jobId: job.id, projectId }, "[PRDAgent] Job started");
   updateJob(job.id, { status: "running", message: "Generating PRD via LLM" });
 
   try {
@@ -29,7 +32,7 @@ export async function generatePRDHandler(req: Request, res: Response): Promise<v
       result,
     });
 
-    res.status(201).json({ jobId: job.id, ...result });
+    reply.code(201).send({ jobId: job.id, ...result });
   } catch (err) {
     updateJob(job.id, {
       status: "failed",
@@ -37,13 +40,16 @@ export async function generatePRDHandler(req: Request, res: Response): Promise<v
       completedAt: new Date().toISOString(),
       error: String(err),
     });
-    req.log.error({ err }, "PRD generation failed");
-    res.status(500).json({ error: "PRD generation failed", message: String(err) });
+    request.log.error({ err }, "[PRDAgent] Job failed");
+    reply.code(500).send({ error: "PRD generation failed", message: String(err) });
   }
 }
 
-export async function listDocumentsHandler(req: Request, res: Response): Promise<void> {
-  const { projectId } = req.params as { projectId: string };
+export async function listDocumentsHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const { projectId } = request.params;
   const documents = await prdService.getDocumentsByProject(projectId);
-  res.json({ documents });
+  reply.send({ documents });
 }

@@ -1,10 +1,10 @@
-import { Router, type IRouter } from "express";
-import healthRouter from "./health.js";
-import agentRouter from "./agent.js";
+import type { FastifyPluginAsync } from "fastify";
+import healthRoutes from "./health.js";
+import agentRoutes from "./agent.js";
 
-const router: IRouter = Router();
+const routes: FastifyPluginAsync = async (fastify) => {
+  await fastify.register(healthRoutes);
+  await fastify.register(agentRoutes);
+};
 
-router.use(healthRouter);
-router.use(agentRouter);
-
-export default router;
+export default routes;

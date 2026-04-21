@@ -12,7 +12,7 @@ type SqlJsStatic = {
 
 type SqlDatabase = {
   run(sql: string, params?: unknown[]): void;
-  exec(sql: string): { columns: string[]; values: unknown[][] }[];
+  exec(sql: string, params?: unknown[]): { columns: string[]; values: unknown[][] }[];
   prepare(sql: string): SqlStatement;
   close(): void;
 };

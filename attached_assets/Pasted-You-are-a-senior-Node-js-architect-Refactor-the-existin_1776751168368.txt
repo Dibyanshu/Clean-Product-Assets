@@ -1,0 +1,188 @@
+You are a senior Node.js architect. Refactor the existing project from Express.js to Fastify WITHOUT breaking the architecture.
+
+## Goal
+
+Migrate the entire backend from Express to Fastify while preserving:
+
+* Folder structure
+* Business logic (services, repositories)
+* API contracts
+* Database logic
+
+---
+
+## STRICT REQUIREMENTS
+
+### 1. REMOVE EXPRESS COMPLETELY
+
+* Remove all express imports
+* Remove app.use, routers, middleware patterns
+* Delete express-specific files if needed
+
+---
+
+### 2. SETUP FASTIFY SERVER
+
+Create:
+
+/src/app.ts
+
+* Initialize Fastify instance
+* Register plugins
+* Register routes
+
+/ src/server.ts
+
+* Start server
+* Handle errors
+
+Use:
+
+* fastify()
+* fastify.register()
+* fastify.listen()
+
+Enable:
+
+* Logger
+* Pretty logs (dev)
+
+---
+
+### 3. ROUTE MIGRATION
+
+Convert ALL routes to Fastify style.
+
+Example conversion:
+
+FROM (Express):
+
+```js
+app.post('/agent/analyze', controller.analyze);
+```
+
+TO (Fastify):
+
+```ts
+fastify.post('/agent/analyze', async (request, reply) => {
+  return controller.analyze(request, reply);
+});
+```
+
+---
+
+### 4. CONTROLLER UPDATE
+
+Controllers must:
+
+* Accept (request, reply)
+* NOT use (req, res)
+
+Example:
+
+```ts
+async analyze(request, reply) {
+  const result = await service.run(request.body.projectId);
+  return result;
+}
+```
+
+---
+
+### 5. VALIDATION (IMPORTANT)
+
+Use Fastify built-in schema validation OR zod.
+
+Example:
+
+```ts
+schema: {
+  body: {
+    type: 'object',
+    required: ['projectId'],
+    properties: {
+      projectId: { type: 'string' }
+    }
+  }
+}
+```
+
+---
+
+### 6. PLUGIN-BASED STRUCTURE
+
+Create:
+
+/plugins
+db.ts
+logger.ts
+
+Register plugins in app.ts
+
+---
+
+### 7. ERROR HANDLING
+
+* Use Fastify error handler
+* No Express middleware patterns
+
+---
+
+### 8. KEEP BUSINESS LOGIC UNCHANGED
+
+DO NOT modify:
+
+* Services
+* Repositories
+* DB queries
+
+Only adapt transport layer (HTTP layer)
+
+---
+
+### 9. TYPESCRIPT STRICTNESS
+
+* Fix all types
+* No `any`
+* Use FastifyRequest, FastifyReply
+
+---
+
+### 10. TEST ENDPOINTS
+
+Ensure these endpoints work:
+
+POST /agent/ingest
+POST /agent/analyze
+POST /agent/generate-prd
+
+---
+
+## OUTPUT EXPECTATION
+
+* Fully working Fastify server
+* No Express dependency left
+* Clean, modular structure
+* All routes functional
+
+---
+
+## BONUS
+
+* Add health check route: GET /health
+* Add request logging
+
+---
+
+## DO NOT
+
+* Do not mix Express and Fastify
+* Do not rewrite business logic
+* Do not flatten folder structure
+
+---
+
+Explain briefly:
+
+1. What you changed
+2. How Fastify differs from Express in this project

@@ -1,41 +1,52 @@
-import express, { type Express } from "express";
-import cors from "cors";
-import pinoHttp from "pino-http";
-import router from "./routes/index.js";
-import { logger } from "./lib/logger.js";
-import { runMigrations } from "./db/migrate.js";
+import Fastify, { type FastifyError } from "fastify";
+import sensible from "@fastify/sensible";
+import corsPlugin from "./plugins/cors.js";
+import dbPlugin from "./plugins/db.js";
+import routes from "./routes/index.js";
 
-const app: Express = express();
+const isProduction = process.env.NODE_ENV === "production";
 
-app.use(
-  pinoHttp({
-    logger,
-    serializers: {
-      req(req) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-        };
-      },
-      res(res) {
-        return {
-          statusCode: res.statusCode,
-        };
+export async function buildApp() {
+  const app = Fastify({
+    logger: {
+      level: process.env.LOG_LEVEL ?? "info",
+      ...(isProduction
+        ? {}
+        : {
+            transport: {
+              target: "pino-pretty",
+              options: { colorize: true },
+            },
+          }),
+      redact: [
+        "req.headers.authorization",
+        "req.headers.cookie",
+        "res.headers['set-cookie']",
+      ],
+      serializers: {
+        req(req) {
+          return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
+        },
+        res(res) {
+          return { statusCode: res.statusCode };
+        },
       },
     },
-  }),
-);
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+  });
 
-app.use("/api", router);
+  await app.register(corsPlugin);
+  await app.register(sensible);
+  await app.register(dbPlugin);
+  await app.register(routes, { prefix: "/api" });
 
-export async function initApp(): Promise<Express> {
-  await runMigrations();
-  logger.info("Application initialized");
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
+    app.log.error({ err: error }, "Unhandled error");
+    const statusCode = error.statusCode ?? 500;
+    reply.code(statusCode).send({
+      error: error.message ?? "Internal Server Error",
+      statusCode,
+    });
+  });
+
   return app;
 }
-
-export default app;
