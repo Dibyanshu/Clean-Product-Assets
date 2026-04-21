@@ -52,6 +52,22 @@ export async function findDocumentById(id: string): Promise<Document | null> {
   return rows.length > 0 ? (rows[0] as unknown as Document) : null;
 }
 
+export async function findLatestDocumentByProjectAndType(projectId: string, type: string): Promise<Document | null> {
+  const db = await getDb();
+  const result = db.exec(
+    `SELECT * FROM documents WHERE project_id = ? AND type = ? ORDER BY created_at DESC LIMIT 1`,
+    [projectId, type] as unknown[],
+  );
+  const rows = rowsToObjects(result);
+  return rows.length > 0 ? (rows[0] as unknown as Document) : null;
+}
+
+export async function deleteDocumentsByProjectAndType(projectId: string, type: string): Promise<number> {
+  const db = await getDb();
+  db.run(`DELETE FROM documents WHERE project_id = ? AND type = ?`, [projectId, type] as unknown[]);
+  return 0;
+}
+
 export async function createApproval(documentId: string): Promise<Approval> {
   const db = await getDb();
   const id = generateId();

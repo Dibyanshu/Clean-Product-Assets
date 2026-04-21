@@ -355,6 +355,78 @@ export const RefreshLineageAICacheResponse = zod.object({
 });
 
 /**
+ * @summary Generate High-Level Design from lineage + Chroma context via LLM
+ */
+export const GenerateHldBody = zod.object({
+  projectId: zod.string(),
+});
+
+export const GenerateHldResponse = zod.object({
+  id: zod.string(),
+  projectId: zod.string(),
+  overview: zod.string(),
+  modules: zod.array(
+    zod.object({
+      name: zod.string(),
+      apis: zod.array(zod.string()),
+      tables: zod.array(zod.string()),
+    }),
+  ),
+  dataFlow: zod.array(zod.string()),
+  architecture: zod.string(),
+  promptVersion: zod.string(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Get the latest stored HLD for a project
+ */
+export const GetHldQueryParams = zod.object({
+  projectId: zod.coerce.string(),
+});
+
+export const GetHldResponse = zod.object({
+  id: zod.string(),
+  projectId: zod.string(),
+  overview: zod.string(),
+  modules: zod.array(
+    zod.object({
+      name: zod.string(),
+      apis: zod.array(zod.string()),
+      tables: zod.array(zod.string()),
+    }),
+  ),
+  dataFlow: zod.array(zod.string()),
+  architecture: zod.string(),
+  promptVersion: zod.string(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete existing HLD and regenerate from latest lineage + context
+ */
+export const RefreshHldBody = zod.object({
+  projectId: zod.string(),
+});
+
+export const RefreshHldResponse = zod.object({
+  id: zod.string(),
+  projectId: zod.string(),
+  overview: zod.string(),
+  modules: zod.array(
+    zod.object({
+      name: zod.string(),
+      apis: zod.array(zod.string()),
+      tables: zod.array(zod.string()),
+    }),
+  ),
+  dataFlow: zod.array(zod.string()),
+  architecture: zod.string(),
+  promptVersion: zod.string(),
+  createdAt: zod.string(),
+});
+
+/**
  * @summary Semantic vector search over indexed code and schema
  */
 export const semanticSearchQueryNDefault = 5;

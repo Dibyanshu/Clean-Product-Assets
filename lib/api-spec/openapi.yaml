@@ -26,6 +26,8 @@ tags:
     description: API ↔ DB lineage mapping agent
   - name: lineage-ai
     description: LLM-enhanced lineage via RAG (Retrieval-Augmented Generation)
+  - name: hld
+    description: Auto High-Level Design generation from lineage + RAG context
 
 paths:
   /healthz:
@@ -458,6 +460,87 @@ paths:
                   evicted:
                     type: integer
                 required: [evicted]
+        "400":
+          description: Missing projectId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/generate-hld:
+    post:
+      operationId: generateHld
+      tags: [hld]
+      summary: Generate High-Level Design from lineage + Chroma context via LLM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateHldRequest"
+      responses:
+        "200":
+          description: HLD generated and stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HldResponse"
+        "400":
+          description: Missing projectId or no APIs found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: LLM or generation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/hld:
+    get:
+      operationId: getHld
+      tags: [hld]
+      summary: Get the latest stored HLD for a project
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HLD document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HldResponse"
+        "404":
+          description: No HLD found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/hld/refresh:
+    post:
+      operationId: refreshHld
+      tags: [hld]
+      summary: Delete existing HLD and regenerate from latest lineage + context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateHldRequest"
+      responses:
+        "200":
+          description: HLD refreshed and stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HldResponse"
         "400":
           description: Missing projectId
           content:
@@ -1023,3 +1106,50 @@ components:
           items:
             $ref: "#/components/schemas/AILineageResult"
       required: [projectId, processed, enhanced, fallback, results]
+
+    GenerateHldRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+      required: [projectId]
+
+    HldModule:
+      type: object
+      properties:
+        name:
+          type: string
+        apis:
+          type: array
+          items:
+            type: string
+        tables:
+          type: array
+          items:
+            type: string
+      required: [name, apis, tables]
+
+    HldResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        overview:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/HldModule"
+        dataFlow:
+          type: array
+          items:
+            type: string
+        architecture:
+          type: string
+        promptVersion:
+          type: string
+        createdAt:
+          type: string
+      required: [id, projectId, overview, modules, dataFlow, architecture, promptVersion, createdAt]

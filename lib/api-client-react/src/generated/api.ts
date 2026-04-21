@@ -29,11 +29,14 @@ import type {
   ErrorResponse,
   ExtractDbSchemaRequest,
   ExtractDbSchemaResponse,
+  GenerateHldRequest,
   GenerateLineageRequest,
   GeneratePRDRequest,
   GeneratePRDResponse,
+  GetHldParams,
   GetLineageParams,
   HealthStatus,
+  HldResponse,
   IngestRequest,
   IngestResponse,
   Job,
@@ -1562,6 +1565,262 @@ export const useRefreshLineageAICache = <
   TContext
 > => {
   return useMutation(getRefreshLineageAICacheMutationOptions(options));
+};
+
+/**
+ * @summary Generate High-Level Design from lineage + Chroma context via LLM
+ */
+export const getGenerateHldUrl = () => {
+  return `/api/agent/generate-hld`;
+};
+
+export const generateHld = async (
+  generateHldRequest: GenerateHldRequest,
+  options?: RequestInit,
+): Promise<HldResponse> => {
+  return customFetch<HldResponse>(getGenerateHldUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateHldRequest),
+  });
+};
+
+export const getGenerateHldMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateHld>>,
+    TError,
+    { data: BodyType<GenerateHldRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateHld>>,
+  TError,
+  { data: BodyType<GenerateHldRequest> },
+  TContext
+> => {
+  const mutationKey = ["generateHld"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateHld>>,
+    { data: BodyType<GenerateHldRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return generateHld(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateHldMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateHld>>
+>;
+export type GenerateHldMutationBody = BodyType<GenerateHldRequest>;
+export type GenerateHldMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Generate High-Level Design from lineage + Chroma context via LLM
+ */
+export const useGenerateHld = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateHld>>,
+    TError,
+    { data: BodyType<GenerateHldRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateHld>>,
+  TError,
+  { data: BodyType<GenerateHldRequest> },
+  TContext
+> => {
+  return useMutation(getGenerateHldMutationOptions(options));
+};
+
+/**
+ * @summary Get the latest stored HLD for a project
+ */
+export const getGetHldUrl = (params: GetHldParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/agent/hld?${stringifiedParams}`
+    : `/api/agent/hld`;
+};
+
+export const getHld = async (
+  params: GetHldParams,
+  options?: RequestInit,
+): Promise<HldResponse> => {
+  return customFetch<HldResponse>(getGetHldUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetHldQueryKey = (params?: GetHldParams) => {
+  return [`/api/agent/hld`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetHldQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHld>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetHldParams,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getHld>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetHldQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getHld>>> = ({
+    signal,
+  }) => getHld(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHld>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHldQueryResult = NonNullable<Awaited<ReturnType<typeof getHld>>>;
+export type GetHldQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get the latest stored HLD for a project
+ */
+
+export function useGetHld<
+  TData = Awaited<ReturnType<typeof getHld>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetHldParams,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getHld>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHldQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Delete existing HLD and regenerate from latest lineage + context
+ */
+export const getRefreshHldUrl = () => {
+  return `/api/agent/hld/refresh`;
+};
+
+export const refreshHld = async (
+  generateHldRequest: GenerateHldRequest,
+  options?: RequestInit,
+): Promise<HldResponse> => {
+  return customFetch<HldResponse>(getRefreshHldUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateHldRequest),
+  });
+};
+
+export const getRefreshHldMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshHld>>,
+    TError,
+    { data: BodyType<GenerateHldRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof refreshHld>>,
+  TError,
+  { data: BodyType<GenerateHldRequest> },
+  TContext
+> => {
+  const mutationKey = ["refreshHld"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof refreshHld>>,
+    { data: BodyType<GenerateHldRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return refreshHld(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RefreshHldMutationResult = NonNullable<
+  Awaited<ReturnType<typeof refreshHld>>
+>;
+export type RefreshHldMutationBody = BodyType<GenerateHldRequest>;
+export type RefreshHldMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Delete existing HLD and regenerate from latest lineage + context
+ */
+export const useRefreshHld = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshHld>>,
+    TError,
+    { data: BodyType<GenerateHldRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof refreshHld>>,
+  TError,
+  { data: BodyType<GenerateHldRequest> },
+  TContext
+> => {
+  return useMutation(getRefreshHldMutationOptions(options));
 };
 
 /**

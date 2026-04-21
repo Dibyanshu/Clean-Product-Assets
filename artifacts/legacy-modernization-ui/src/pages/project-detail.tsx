@@ -2,12 +2,13 @@ import { useGetProject, useListApis, useListDocuments, useListJobs } from "@work
 import { DbSchemaTab } from "@/components/db-schema-tab";
 import { SemanticSearchPanel } from "@/components/semantic-search-panel";
 import { LineageTab } from "@/components/lineage-tab";
+import { HldTab } from "@/components/hld-tab";
 import { useParams } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Activity, Server, GitBranch, TerminalSquare, Search, ChevronLeft, Database, Cpu, GitMerge } from "lucide-react";
+import { FileText, Activity, Server, GitBranch, TerminalSquare, Search, ChevronLeft, Database, Cpu, GitMerge, Layers } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -98,6 +99,10 @@ export function ProjectDetail() {
           <TabsTrigger value="lineage" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-lineage">
             <GitMerge className="w-3 h-3 mr-2" />
             Lineage
+          </TabsTrigger>
+          <TabsTrigger value="hld" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-hld">
+            <Layers className="w-3 h-3 mr-2" />
+            Generated HLD
           </TabsTrigger>
           <TabsTrigger value="jobs" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-jobs">
             <Activity className="w-3 h-3 mr-2" />
@@ -254,6 +259,19 @@ export function ProjectDetail() {
             </CardHeader>
             <CardContent className="p-6">
               <LineageTab projectId={id!} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="hld" className="mt-0">
+          <Card className="border-border/50 bg-card/50 backdrop-blur rounded-none">
+            <CardHeader className="border-b border-border/30 bg-muted/5 pb-4">
+              <CardTitle className="font-mono text-sm uppercase flex items-center text-muted-foreground">
+                <Layers className="w-4 h-4 mr-2 text-violet-400" /> Auto-Generated High-Level Design
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <HldTab projectId={id!} />
             </CardContent>
           </Card>
         </TabsContent>

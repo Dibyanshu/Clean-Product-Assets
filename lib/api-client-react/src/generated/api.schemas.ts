@@ -341,6 +341,27 @@ export interface BulkAILineageResult {
   results: AILineageResult[];
 }
 
+export interface GenerateHldRequest {
+  projectId: string;
+}
+
+export interface HldModule {
+  name: string;
+  apis: string[];
+  tables: string[];
+}
+
+export interface HldResponse {
+  id: string;
+  projectId: string;
+  overview: string;
+  modules: HldModule[];
+  dataFlow: string[];
+  architecture: string;
+  promptVersion: string;
+  createdAt: string;
+}
+
 export type ListProjects200 = {
   projects: Project[];
 };
@@ -366,6 +387,10 @@ export type GetLineageParams = {
 
 export type RefreshLineageAICache200 = {
   evicted: number;
+};
+
+export type GetHldParams = {
+  projectId: string;
 };
 
 export type SemanticSearchParams = {

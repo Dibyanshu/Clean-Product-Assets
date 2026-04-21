@@ -8,7 +8,8 @@ interface LlmContext {
   promptName: string;
   promptVersion: string;
   projectId: string;
-  apiId: string;
+  apiId?: string;
+  maxTokens?: number;
 }
 
 let _openai: unknown = null;
@@ -33,7 +34,7 @@ export async function generate(prompt: string, ctx: LlmContext): Promise<string>
         (async () => {
           const response = await (client as import("openai").default).chat.completions.create({
             model: "gpt-5-mini",
-            max_completion_tokens: 1024,
+            max_completion_tokens: ctx.maxTokens ?? 1024,
             messages: [
               {
                 role: "system",
@@ -122,4 +123,85 @@ export function parseLineageOutput(raw: string): LlmLineageOutput {
   }
 
   return { tables, flow };
+}
+
+export interface LlmHldModule {
+  name: string;
+  apis: string[];
+  tables: string[];
+}
+
+export interface LlmHldOutput {
+  overview: string;
+  modules: LlmHldModule[];
+  dataFlow: string[];
+  architecture: string;
+}
+
+export function parseHldOutput(raw: string): LlmHldOutput {
+  const stripped = raw
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch {
+    throw new Error(`Invalid JSON from HLD LLM: ${stripped.slice(0, 200)}`);
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("HLD LLM returned non-object JSON");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+
+  const overview = typeof obj["overview"] === "string" ? obj["overview"].trim() : "";
+  const architecture = typeof obj["architecture"] === "string" ? obj["architecture"].trim() : "";
+
+  const dataFlow: string[] = [];
+  if (Array.isArray(obj["dataFlow"])) {
+    for (const f of obj["dataFlow"] as unknown[]) {
+      if (typeof f === "string" && f.trim()) dataFlow.push(f.trim());
+    }
+  }
+
+  const modules: LlmHldModule[] = [];
+  if (Array.isArray(obj["modules"])) {
+    for (const m of obj["modules"] as unknown[]) {
+      if (typeof m !== "object" || m === null) continue;
+      const mod = m as Record<string, unknown>;
+      const name = typeof mod["name"] === "string" ? mod["name"].trim() : null;
+      if (!name) continue;
+
+      const apis: string[] = [];
+      if (Array.isArray(mod["apis"])) {
+        for (const a of mod["apis"] as unknown[]) {
+          if (typeof a === "string" && a.trim()) apis.push(a.trim());
+        }
+      }
+
+      const tables: string[] = [];
+      if (Array.isArray(mod["tables"])) {
+        for (const t of mod["tables"] as unknown[]) {
+          if (typeof t === "string" && t.trim()) {
+            const normalized = t.trim().toLowerCase();
+            if (/^[a-z_][a-z0-9_]*$/.test(normalized)) tables.push(normalized);
+          }
+        }
+      }
+
+      if (apis.length > 0 || tables.length > 0) {
+        modules.push({ name, apis, tables });
+      }
+    }
+  }
+
+  if (modules.length === 0) {
+    throw new Error("HLD LLM returned no valid modules");
+  }
+
+  return { overview, modules, dataFlow, architecture };
 }

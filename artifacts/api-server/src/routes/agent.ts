@@ -20,6 +20,7 @@ import { searchHandler } from "../modules/search/controller/search.controller.js
 import { testAstMultiHandler } from "../modules/ast-test/controller/astTest.controller.js";
 import { generateLineageHandler, getLineageHandler } from "../modules/lineage/controller/lineage.controller.js";
 import { lineageAIController } from "../modules/lineage-ai/controller/lineageAI.controller.js";
+import { hldController } from "../modules/hld/controller/hld.controller.js";
 import { listJobs, getJob } from "../utils/jobTracker.js";
 
 const agentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -43,6 +44,7 @@ const agentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/agent/lineage", getLineageHandler);
 
   await fastify.register(lineageAIController, { prefix: "/agent" });
+  await fastify.register(hldController, { prefix: "/agent" });
 
   fastify.get("/agent/jobs", async (_request, reply) => {
     return reply.send({ jobs: listJobs() });

@@ -1,0 +1,262 @@
+You are a senior software architect. Extend the existing Fastify-based Node.js system to implement **Auto High-Level Design (HLD) generation from API ↔ DB lineage using RAG (Chroma + LLM)**.
+
+This feature must generate structured HLD documents based on system understanding derived from lineage and code context.
+
+---
+
+# 🎯 OBJECTIVE
+
+Generate a High-Level Design (HLD) that includes:
+
+* System overview
+* Logical modules/services
+* API grouping per module
+* Database mapping
+* Data flow between modules
+* Architecture suggestions
+
+---
+
+# 🧱 ARCHITECTURE ADDITION
+
+Create:
+
+/modules/hld
+hld.controller.ts
+hld.service.ts
+
+---
+
+# 🧠 INPUT DATA SOURCES
+
+Use:
+
+* api_table_map (lineage data)
+* API definitions
+* DB schema
+* Chroma (for semantic context)
+
+---
+
+# ⚙️ HLD GENERATION FLOW
+
+## Step 1: Aggregate Data
+
+For a project:
+
+* Group APIs by:
+
+  * table usage
+  * naming similarity
+
+* Build clusters:
+
+  * APIs touching same tables → same module
+
+---
+
+## Step 2: Retrieve Context (Chroma)
+
+Query:
+
+* “authentication logic”
+* “order processing”
+* “user management”
+
+Retrieve:
+
+* relevant functions
+* business logic
+
+---
+
+## Step 3: Build Prompt (MANDATORY STRUCTURE)
+
+Use prompt.service with versioning
+
+---
+
+## PROMPT TEMPLATE
+
+```text id="pn6v8o"
+You are a senior system architect.
+
+Given the following system data:
+
+API to DB lineage:
+{lineage}
+
+Database schema:
+{schema}
+
+Code context:
+{context}
+
+Generate a High-Level Design (HLD) with:
+
+1. System Overview
+2. Modules/Services (group APIs logically)
+3. API mapping per module
+4. Database tables per module
+5. Data flow between modules
+6. Architecture recommendation
+
+Return STRICT JSON:
+
+{
+  "overview": "string",
+  "modules": [
+    {
+      "name": "string",
+      "apis": ["string"],
+      "tables": ["string"]
+    }
+  ],
+  "dataFlow": [
+    "Module A → Module B"
+  ],
+  "architecture": "string"
+}
+```
+
+---
+
+## Step 4: LLM CALL (MANDATORY)
+
+* Retry up to 3 times
+* Validate JSON strictly
+
+---
+
+## Step 5: POST-PROCESSING
+
+* Normalize module names
+* Remove duplicates
+* Validate:
+
+  * each API appears in a module
+  * each table is mapped
+
+---
+
+## Step 6: STORE RESULT
+
+Table:
+
+documents
+
+Fields:
+
+* type: "HLD"
+* content: JSON
+* project_id
+* version
+* created_at
+
+---
+
+# 🔌 API ENDPOINTS
+
+## Generate HLD
+
+POST /agent/generate-hld
+
+Input:
+
+```json id="g8l3ka"
+{
+  "projectId": "string"
+}
+```
+
+---
+
+## Get HLD
+
+GET /agent/hld?projectId=xxx
+
+---
+
+## Regenerate HLD
+
+POST /agent/hld/refresh
+
+---
+
+# 📦 RESPONSE FORMAT
+
+```json id="xj6z71"
+{
+  "overview": "E-commerce system...",
+  "modules": [
+    {
+      "name": "Order Service",
+      "apis": ["/orders", "/orders/{id}"],
+      "tables": ["orders", "order_items"]
+    }
+  ],
+  "dataFlow": [
+    "User Service → Order Service"
+  ],
+  "architecture": "Modular Monolith"
+}
+```
+
+---
+
+# 🖥️ FRONTEND REQUIREMENTS
+
+In "GENERATED HLD" tab:
+
+### DISPLAY
+
+* Overview (text)
+* Modules (cards)
+* APIs per module
+* Tables per module
+* Data flow (list or diagram)
+
+---
+
+### ADD BUTTONS
+
+* “Generate HLD”
+* “Regenerate”
+* “Export JSON”
+
+---
+
+# ⚠️ STRICT RULES
+
+* DO NOT generate HLD without lineage data
+* ALWAYS use Chroma for context
+* VALIDATE LLM output
+* DO NOT allow empty modules
+
+---
+
+# 📈 SUCCESS CRITERIA
+
+* APIs grouped logically into modules
+* Tables correctly mapped
+* Flow reflects real interactions
+* Output is structured and usable
+
+---
+
+# 🧪 LOGGING (MANDATORY)
+
+* prompt version
+* lineage size
+* context size
+* LLM attempts
+* validation failures
+
+---
+
+# EXPLAIN
+
+1. How lineage feeds into HLD
+2. How modules are derived
+3. How LLM improves architecture inference
+4. Limitations and future improvements

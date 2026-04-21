@@ -16,6 +16,49 @@ export interface LineagePromptInput {
 }
 
 const PROMPTS: Record<string, PromptTemplate> = {
+  hld_analysis_v1: {
+    version: "v1",
+    name: "hld_analysis",
+    template: `You are a senior system architect.
+
+Given the following system data extracted from a legacy codebase:
+
+API to DB Lineage (which API endpoints touch which database tables):
+{lineage}
+
+Database Schema (table names present in the system):
+{schema}
+
+Code Context (relevant business logic retrieved from the codebase):
+{context}
+
+Generate a High-Level Design (HLD) document. Group APIs logically into services/modules based on the data they access and their naming patterns.
+
+Return STRICT JSON only — no markdown fences, no explanation, no trailing text:
+{
+  "overview": "One to three sentence system overview describing the main purpose and architecture",
+  "modules": [
+    {
+      "name": "Service or module name (e.g. User Management, Order Service)",
+      "apis": ["METHOD /path/to/endpoint", "METHOD /other/endpoint"],
+      "tables": ["lowercase_table_name", "another_table"]
+    }
+  ],
+  "dataFlow": [
+    "Module A → Module B (reason or data exchanged)"
+  ],
+  "architecture": "One sentence architecture style recommendation (e.g. Modular Monolith, Microservices, Layered)"
+}
+
+Rules:
+- Every API endpoint must appear in exactly one module
+- Every known table must appear in at least one module if it is referenced in the lineage
+- Module names must be descriptive business domain names (not technical names like 'Controller' or 'Repository')
+- dataFlow entries must reference actual module names from the modules array
+- Do not create empty modules (modules with no apis AND no tables)
+- Aim for 3-7 modules for a well-structured design`,
+  },
+
   lineage_analysis_v1: {
     version: "v1",
     name: "lineage_analysis",
@@ -65,6 +108,25 @@ export function getPrompt(name: string): PromptTemplate {
 
 export function getLatestVersion(name: string): string {
   return getPrompt(name).version;
+}
+
+export interface HldPromptInput {
+  lineageText: string;
+  schemaText: string;
+  contextText: string;
+}
+
+export function buildHldPrompt(input: HldPromptInput): { text: string; version: string } {
+  const key = "hld_analysis_v1";
+  const tmpl = PROMPTS[key];
+  if (!tmpl) throw new Error("HLD prompt template not found");
+
+  const text = tmpl.template
+    .replace("{lineage}", input.lineageText || "  (no lineage data — run generate-lineage first)")
+    .replace("{schema}", input.schemaText || "  (no schema extracted)")
+    .replace("{context}", input.contextText || "  (no code context available)");
+
+  return { text, version: tmpl.version };
 }
 
 export function buildLineagePrompt(input: LineagePromptInput): { text: string; version: string } {
