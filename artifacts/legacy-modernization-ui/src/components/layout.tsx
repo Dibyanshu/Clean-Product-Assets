@@ -16,7 +16,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className="w-full md:w-64 border-r border-border bg-sidebar shrink-0 flex flex-col">
         <div className="h-16 flex items-center px-6 border-b border-border shrink-0">
           <Rocket className="w-5 h-5 text-primary mr-3" />
-          <h1 className="font-bold text-sm tracking-widest uppercase text-primary">Nexus.Agent</h1>
+          <h1 className="font-bold text-sm tracking-widest uppercase text-primary">ArchonAI</h1>
         </div>
         <nav className="flex-1 py-6 px-3 flex flex-col gap-1">
           {navItems.map((item) => {
