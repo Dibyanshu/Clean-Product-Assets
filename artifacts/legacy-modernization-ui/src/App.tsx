@@ -10,6 +10,7 @@ import { ProjectsList } from "@/pages/projects-list";
 import { ProjectDetail } from "@/pages/project-detail";
 import { JobsList } from "@/pages/jobs-list";
 import { DbBrowser } from "@/pages/db-browser";
+import { PipelineProvider } from "@/contexts/pipeline-context";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,7 +41,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <PipelineProvider>
+            <Router />
+          </PipelineProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
