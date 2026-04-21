@@ -1,9 +1,82 @@
+import { exec } from "child_process";
+import { promisify } from "util";
+import fs from "fs";
+import path from "path";
 import { logger } from "../../../lib/logger.js";
 import * as ingestionRepo from "../repository/ingestion.repository.js";
 import * as chroma from "../../../services/chroma.service.js";
 import { extractChunks } from "../../../services/ast/astChunker.service.js";
 
-const MOCK_FILE_TREE = [
+const execAsync = promisify(exec);
+
+const SUPPORTED_EXTENSIONS = new Set([
+  ".js", ".mjs", ".cjs",
+  ".ts", ".tsx", ".mts",
+  ".java",
+  ".cs",
+  ".sql",
+  ".json", ".md", ".txt",
+  ".py", ".go", ".rb", ".php",
+]);
+
+const SKIP_DIRS = new Set([
+  "node_modules", ".git", "dist", "build", "bin", "obj",
+  "target", "vendor", ".gradle", ".idea", ".vscode",
+  "__pycache__", ".pytest_cache", "coverage", ".nyc_output",
+  "out", "output", ".next", ".nuxt", "public", "static",
+]);
+
+const MAX_FILE_SIZE = 150_000;
+const CLONE_TIMEOUT_MS = 90_000;
+
+function walkDirectory(dir: string): Array<{ fullPath: string; relativePath: string; ext: string; size: number }> {
+  const results: Array<{ fullPath: string; relativePath: string; ext: string; size: number }> = [];
+
+  function walk(current: string, base: string) {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+
+      const fullPath = path.join(current, entry.name);
+      const relativePath = path.relative(base, fullPath);
+
+      if (entry.isDirectory()) {
+        walk(fullPath, base);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
+
+        let size = 0;
+        try {
+          size = fs.statSync(fullPath).size;
+        } catch {
+          continue;
+        }
+        if (size > MAX_FILE_SIZE) continue;
+
+        results.push({ fullPath, relativePath, ext, size });
+      }
+    }
+  }
+
+  walk(dir, dir);
+  return results;
+}
+
+function cleanupDir(dir: string) {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch {
+  }
+}
+
+const DEMO_FILE_TREE = [
   { path: "src/index.js", extension: ".js", size: 1240 },
   { path: "src/routes/users.js", extension: ".js", size: 3200 },
   { path: "src/routes/products.js", extension: ".js", size: 2800 },
@@ -19,7 +92,7 @@ const MOCK_FILE_TREE = [
   { path: "README.md", extension: ".md", size: 3400 },
 ];
 
-const MOCK_FILE_CONTENT: Record<string, string> = {
+const DEMO_FILE_CONTENT: Record<string, string> = {
   "src/index.js": `const express = require('express');
 const app = express();
 app.use(express.json());
@@ -137,20 +210,10 @@ module.exports = Product;`,
   "src/services/emailService.js": `const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: 587 });
 async function sendWelcomeEmail(user) {
-  await transporter.sendMail({
-    from: 'noreply@legacy-shop.com',
-    to: user.email,
-    subject: 'Welcome!',
-    text: 'Thanks for signing up.',
-  });
+  await transporter.sendMail({ from: 'noreply@legacy-shop.com', to: user.email, subject: 'Welcome!', text: 'Thanks for signing up.' });
 }
 async function sendOrderConfirmation(user, order) {
-  await transporter.sendMail({
-    from: 'orders@legacy-shop.com',
-    to: user.email,
-    subject: 'Order Confirmed #' + order.id,
-    text: 'Your order total: $' + order.total_amount,
-  });
+  await transporter.sendMail({ from: 'orders@legacy-shop.com', to: user.email, subject: 'Order Confirmed #' + order.id, text: 'Your order total: $' + order.total_amount });
 }
 module.exports = { sendWelcomeEmail, sendOrderConfirmation };`,
 
@@ -159,103 +222,45 @@ const path = require('path');
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/shop.db');
 const db = new sqlite3.Database(DB_PATH);
 function query(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-  });
+  return new Promise((resolve, reject) => { db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows)); });
 }
 function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, (err) => err ? reject(err) : resolve());
-  });
+  return new Promise((resolve, reject) => { db.run(sql, params, (err) => err ? reject(err) : resolve()); });
 }
 module.exports = { query, run };`,
 
   "src/repositories/UserRepository.java": `package com.legacyshop.repositories;
-
 import com.legacyshop.models.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
-
 @Repository
 public class UserRepository extends JpaRepository<User, String> {
-
     @Query("SELECT u FROM User u WHERE u.email = :email")
-    public User findByEmail(String email) {
-        return userRepository.findOne(email);
-    }
-
-    public boolean existsByEmail(String email) {
-        return userRepository.existsByEmail(email);
-    }
-
+    public User findByEmail(String email) { return userRepository.findOne(email); }
+    public boolean existsByEmail(String email) { return userRepository.existsByEmail(email); }
     @Query("SELECT u FROM User u WHERE u.role = 'admin' AND u.active = true")
-    public List<User> findActiveAdmins() {
-        return userRepository.findAll(isAdmin());
-    }
+    public List<User> findActiveAdmins() { return userRepository.findAll(isAdmin()); }
 }`,
 
   "src/controllers/ProductsController.cs": `using Microsoft.AspNetCore.Mvc;
 using LegacyShop.Models;
 using LegacyShop.Services;
-
-namespace LegacyShop.Controllers
-{
+namespace LegacyShop.Controllers {
     [ApiController]
     [Route("api/[controller]")]
-    public class ProductsController : ControllerBase
-    {
+    public class ProductsController : ControllerBase {
         private readonly IProductService _productService;
-
-        public ProductsController(IProductService productService)
-        {
-            _productService = productService;
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] string? category)
-        {
-            var products = await _productService.GetAllAsync(category);
-            return Ok(products);
-        }
-
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(string id)
-        {
-            var product = await _productService.GetByIdAsync(id);
-            if (product == null) return NotFound();
-            return Ok(product);
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
-        {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-            var product = await _productService.CreateAsync(dto);
-            return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
-        }
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(string id, [FromBody] UpdateProductDto dto)
-        {
-            var product = await _productService.UpdateAsync(id, dto);
-            if (product == null) return NotFound();
-            return Ok(product);
-        }
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(string id)
-        {
-            var success = await _productService.DeleteAsync(id);
-            if (!success) return NotFound();
-            return NoContent();
-        }
+        public ProductsController(IProductService productService) { _productService = productService; }
+        [HttpGet] public async Task<IActionResult> GetAll([FromQuery] string? category) { var products = await _productService.GetAllAsync(category); return Ok(products); }
+        [HttpGet("{id}")] public async Task<IActionResult> GetById(string id) { var product = await _productService.GetByIdAsync(id); if (product == null) return NotFound(); return Ok(product); }
+        [HttpPost] public async Task<IActionResult> Create([FromBody] CreateProductDto dto) { if (!ModelState.IsValid) return BadRequest(ModelState); var product = await _productService.CreateAsync(dto); return CreatedAtAction(nameof(GetById), new { id = product.Id }, product); }
+        [HttpPut("{id}")] public async Task<IActionResult> Update(string id, [FromBody] UpdateProductDto dto) { var product = await _productService.UpdateAsync(id, dto); if (product == null) return NotFound(); return Ok(product); }
+        [HttpDelete("{id}")] public async Task<IActionResult> Delete(string id) { var success = await _productService.DeleteAsync(id); if (!success) return NotFound(); return NoContent(); }
     }
 }`,
 
-  "sql/schema.sql": `-- Legacy shop database schema
-
-CREATE TABLE users (
+  "sql/schema.sql": `CREATE TABLE users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
@@ -264,7 +269,6 @@ CREATE TABLE users (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -274,7 +278,6 @@ CREATE TABLE products (
   category TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE orders (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
@@ -284,7 +287,6 @@ CREATE TABLE orders (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE order_items (
   id TEXT PRIMARY KEY,
   order_id TEXT NOT NULL REFERENCES orders(id),
@@ -292,29 +294,10 @@ CREATE TABLE order_items (
   quantity INTEGER NOT NULL,
   unit_price REAL NOT NULL
 );
+CREATE FUNCTION calculate_order_total(order_id TEXT) RETURNS REAL AS $$ SELECT SUM(quantity * unit_price) FROM order_items WHERE order_id = order_id; $$ LANGUAGE sql;
+CREATE PROCEDURE update_product_stock(p_product_id TEXT, p_delta INTEGER) BEGIN UPDATE products SET stock_count = stock_count + p_delta WHERE id = p_product_id; END;`,
 
-CREATE FUNCTION calculate_order_total(order_id TEXT)
-RETURNS REAL AS $$
-  SELECT SUM(quantity * unit_price) FROM order_items WHERE order_id = order_id;
-$$ LANGUAGE sql;
-
-CREATE PROCEDURE update_product_stock(p_product_id TEXT, p_delta INTEGER)
-BEGIN
-  UPDATE products SET stock_count = stock_count + p_delta WHERE id = p_product_id;
-END;`,
-
-  "package.json": `{
-  "name": "legacy-shop",
-  "version": "1.0.0",
-  "dependencies": {
-    "express": "^4.18.2",
-    "sqlite3": "^5.1.6",
-    "jsonwebtoken": "^9.0.0",
-    "bcrypt": "^5.1.0",
-    "nodemailer": "^6.9.0",
-    "uuid": "^9.0.0"
-  }
-}`,
+  "package.json": `{"name":"legacy-shop","version":"1.0.0","dependencies":{"express":"^4.18.2","sqlite3":"^5.1.6","jsonwebtoken":"^9.0.0","bcrypt":"^5.1.0","nodemailer":"^6.9.0","uuid":"^9.0.0"}}`,
 
   "README.md": `# Legacy Shop
 A legacy e-commerce backend in Express.js + SQLite with Java/C# service layer.
@@ -324,9 +307,60 @@ A legacy e-commerce backend in Express.js + SQLite with Java/C# service layer.
 - JWT authentication
 - Java Spring Data repository layer
 - .NET ASP.NET Core controllers
-- Order management with SQL stored procedures
-`,
+- Order management with SQL stored procedures`,
 };
+
+async function ingestFromGit(
+  repoUrl: string,
+  projectId: string,
+): Promise<{ files: Array<{ path: string; extension: string; size: number; content: string }>; method: "git" | "demo" }> {
+  const tmpDir = `/tmp/archonai-${projectId}`;
+
+  try {
+    logger.info({ projectId, repoUrl, tmpDir }, "[IngestionAgent] Cloning repository");
+    await execAsync(`git clone --depth 1 --single-branch "${repoUrl}" "${tmpDir}"`, {
+      timeout: CLONE_TIMEOUT_MS,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    });
+
+    const entries = walkDirectory(tmpDir);
+    logger.info({ projectId, found: entries.length }, "[IngestionAgent] Files found in cloned repo");
+
+    if (entries.length === 0) {
+      logger.warn({ projectId }, "[IngestionAgent] No supported files found — falling back to demo dataset");
+      cleanupDir(tmpDir);
+      return buildDemoDataset();
+    }
+
+    const files: Array<{ path: string; extension: string; size: number; content: string }> = [];
+    for (const entry of entries) {
+      try {
+        const content = fs.readFileSync(entry.fullPath, "utf-8");
+        files.push({ path: entry.relativePath, extension: entry.ext, size: entry.size, content });
+      } catch {
+      }
+    }
+
+    cleanupDir(tmpDir);
+    logger.info({ projectId, fileCount: files.length }, "[IngestionAgent] Files read from real repo");
+    return { files, method: "git" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn({ projectId, error: message.slice(0, 200) }, "[IngestionAgent] git clone failed — falling back to demo dataset");
+    cleanupDir(tmpDir);
+    return buildDemoDataset();
+  }
+}
+
+function buildDemoDataset(): { files: Array<{ path: string; extension: string; size: number; content: string }>; method: "demo" } {
+  const files = DEMO_FILE_TREE.map((f) => ({
+    path: f.path,
+    extension: f.extension,
+    size: f.size,
+    content: DEMO_FILE_CONTENT[f.path] ?? "",
+  }));
+  return { files, method: "demo" };
+}
 
 export interface IngestResult {
   projectId: string;
@@ -336,7 +370,7 @@ export interface IngestResult {
 }
 
 export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
-  const repoName = repoUrl.split("/").pop()?.replace(".git", "") ?? "unknown-project";
+  const repoName = repoUrl.split("/").pop()?.replace(/\.git$/i, "") ?? "unknown-project";
   logger.info({ repoUrl, repoName }, "[IngestionAgent] Starting ingestion");
 
   const project = await ingestionRepo.createProject(repoUrl, repoName);
@@ -344,25 +378,27 @@ export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
 
   await ingestionRepo.updateProjectStatus(project.id, "ingesting");
 
-  const files: ingestionRepo.ProjectFile[] = [];
-  for (const f of MOCK_FILE_TREE) {
+  const { files: rawFiles, method } = await ingestFromGit(repoUrl, project.id);
+
+  logger.info({ projectId: project.id, method, fileCount: rawFiles.length }, "[IngestionAgent] Source files loaded");
+
+  const storedFiles: ingestionRepo.ProjectFile[] = [];
+  for (const f of rawFiles) {
     const file = await ingestionRepo.insertFile(project.id, f.path, f.extension, f.size);
-    files.push(file);
+    storedFiles.push(file);
   }
 
-  await ingestionRepo.updateProjectStatus(project.id, "ingested", files.length);
-  logger.info({ projectId: project.id, fileCount: files.length }, "[IngestionAgent] Ingestion complete");
+  await ingestionRepo.updateProjectStatus(project.id, "ingested", storedFiles.length);
+  logger.info({ projectId: project.id, fileCount: storedFiles.length }, "[IngestionAgent] Ingestion complete");
 
-  // --- AST-based chunking → vector store ---
   chroma.createOrGetCollection(project.id);
   const docs: Parameters<typeof chroma.upsertDocuments>[1] = [];
   const langStats: Record<string, number> = {};
 
-  for (const f of MOCK_FILE_TREE) {
-    const content = MOCK_FILE_CONTENT[f.path];
-    if (!content) continue;
+  for (const f of rawFiles) {
+    if (!f.content) continue;
 
-    const chunks = extractChunks(f.path, content);
+    const chunks = extractChunks(f.path, f.content);
 
     if (chunks.length > 0) {
       for (const chunk of chunks) {
@@ -374,11 +410,9 @@ export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
         langStats[chunk.metadata.language] = (langStats[chunk.metadata.language] ?? 0) + 1;
       }
     } else {
-      // Non-parseable files (JSON, MD, etc.) — simple 500-char chunks
-      const words = content.slice(0, 1500);
       docs.push({
         id: `${project.id}::raw::${f.path}`,
-        content: words,
+        content: f.content.slice(0, 1500),
         metadata: { type: "code", file: f.path },
       });
     }
@@ -390,7 +424,7 @@ export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
     "[IngestionAgent] AST chunks indexed in vector store",
   );
 
-  return { projectId: project.id, projectName: repoName, fileCount: files.length, files };
+  return { projectId: project.id, projectName: repoName, fileCount: storedFiles.length, files: storedFiles };
 }
 
 export async function getProject(projectId: string) {

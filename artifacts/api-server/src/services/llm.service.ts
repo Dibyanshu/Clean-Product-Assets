@@ -73,6 +73,58 @@ export async function generate(prompt: string, ctx: LlmContext): Promise<string>
   throw lastError ?? new Error("LLM generation failed after retries");
 }
 
+export interface LlmPrdSection {
+  title: string;
+  content: string;
+}
+
+export interface LlmPrdOutput {
+  title: string;
+  overview: string;
+  sections: LlmPrdSection[];
+}
+
+export function parsePrdOutput(raw: string): LlmPrdOutput {
+  const stripped = raw
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch {
+    throw new Error(`Invalid JSON from PRD LLM: ${stripped.slice(0, 200)}`);
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("PRD LLM returned non-object JSON");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+
+  const title = typeof obj["title"] === "string" && obj["title"].trim() ? obj["title"].trim() : null;
+  const overview = typeof obj["overview"] === "string" ? obj["overview"].trim() : "";
+
+  if (!title) throw new Error('PRD LLM output missing "title" string');
+
+  const sections: LlmPrdSection[] = [];
+  if (Array.isArray(obj["sections"])) {
+    for (const s of obj["sections"] as unknown[]) {
+      if (typeof s !== "object" || s === null) continue;
+      const sec = s as Record<string, unknown>;
+      const secTitle = typeof sec["title"] === "string" ? sec["title"].trim() : null;
+      const secContent = typeof sec["content"] === "string" ? sec["content"].trim() : "";
+      if (secTitle && secContent) sections.push({ title: secTitle, content: secContent });
+    }
+  }
+
+  if (sections.length === 0) throw new Error("PRD LLM returned no valid sections");
+
+  return { title, overview, sections };
+}
+
 export interface LlmLineageOutput {
   tables: Array<{ name: string; operation: string }>;
   flow: string[];
