@@ -110,8 +110,18 @@ export function HldTab({ projectId }: HldTabProps) {
 
   const busy = generating || refreshing;
 
+  const isDeterministic = hldData?.promptVersion === "deterministic-v1";
+
   return (
     <div className="space-y-6">
+      {hldData && isDeterministic && (
+        <div className="flex items-center gap-2 px-3 py-2 border border-amber-500/30 bg-amber-500/5 font-mono text-xs text-amber-400">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            HLD generated from lineage data (LLM was unavailable). Click "Regenerate" when the AI service recovers for a richer analysis.
+          </span>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 font-mono text-xs uppercase text-muted-foreground">
           <Layers className="w-4 h-4 text-violet-400" />
@@ -119,7 +129,9 @@ export function HldTab({ projectId }: HldTabProps) {
           {hldData && (
             <span className="text-muted-foreground/50">
               · generated {format(new Date(hldData.createdAt), "yyyy-MM-dd HH:mm")}
-              <span className="ml-2 text-violet-400/60">· prompt {hldData.promptVersion}</span>
+              <span className={cn("ml-2", isDeterministic ? "text-amber-400/60" : "text-violet-400/60")}>
+                · {isDeterministic ? "deterministic" : `prompt ${hldData.promptVersion}`}
+              </span>
             </span>
           )}
         </div>

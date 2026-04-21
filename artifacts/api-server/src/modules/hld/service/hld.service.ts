@@ -71,6 +71,78 @@ async function buildSchemaText(projectId: string): Promise<string> {
   }
 }
 
+function buildDeterministicHld(
+  apis: Array<{ id: string; method: string; path: string }>,
+  tableMaps: Array<{ api_id: string; table_name: string; operation: string }>,
+  schemaTableNames: string[],
+): llmService.LlmHldOutput {
+  // Group APIs by first meaningful path segment (e.g. /api/users/... → "users")
+  const moduleMap = new Map<string, { apis: Array<{ id: string; method: string; path: string }>; tables: Set<string> }>();
+
+  for (const api of apis) {
+    const segments = api.path.replace(/^\/+/, "").split("/").filter(Boolean);
+    // Skip generic prefixes like "api", "v1", "v2"
+    let groupKey =
+      segments.find((s) => !/^(api|v\d+|rest|service)$/i.test(s)) ??
+      segments[0] ??
+      "core";
+    // strip leading colon or brace params
+    groupKey = groupKey.replace(/^[:{}]/, "").replace(/[{}]/g, "").toLowerCase();
+    if (!groupKey) groupKey = "core";
+
+    if (!moduleMap.has(groupKey)) {
+      moduleMap.set(groupKey, { apis: [], tables: new Set() });
+    }
+    moduleMap.get(groupKey)!.apis.push(api);
+  }
+
+  // Map tables to modules via lineage
+  const apiToGroup = new Map<string, string>();
+  for (const api of apis) {
+    const segments = api.path.replace(/^\/+/, "").split("/").filter(Boolean);
+    let groupKey =
+      segments.find((s) => !/^(api|v\d+|rest|service)$/i.test(s)) ??
+      segments[0] ??
+      "core";
+    groupKey = groupKey.replace(/^[:{}]/, "").replace(/[{}]/g, "").toLowerCase();
+    if (!groupKey) groupKey = "core";
+    apiToGroup.set(api.id, groupKey);
+  }
+
+  for (const tm of tableMaps) {
+    const group = apiToGroup.get(tm.api_id);
+    if (group && moduleMap.has(group)) {
+      moduleMap.get(group)!.tables.add(tm.table_name.toLowerCase());
+    }
+  }
+
+  const modules: llmService.LlmHldModule[] = [];
+  for (const [key, { apis: modApis, tables }] of moduleMap) {
+    const name = key.charAt(0).toUpperCase() + key.slice(1) + " Module";
+    const apiLabels = modApis.slice(0, 20).map((a) => `${a.method} ${a.path}`);
+    modules.push({ name, apis: apiLabels, tables: Array.from(tables) });
+  }
+
+  if (modules.length === 0) {
+    modules.push({ name: "Core Module", apis: apis.slice(0, 10).map((a) => `${a.method} ${a.path}`), tables: schemaTableNames.slice(0, 5) });
+  }
+
+  const tableList = schemaTableNames.slice(0, 10).join(", ") || "none detected";
+  const dataFlow = [
+    `Client sends HTTP request to one of ${apis.length} endpoints`,
+    `API layer routes request to appropriate handler`,
+    `Handler reads/writes data in the database (${tableList})`,
+    `Response serialized and returned to client`,
+  ];
+
+  return {
+    overview: `System with ${apis.length} API endpoints grouped into ${modules.length} module(s). Data persisted in ${schemaTableNames.length} table(s) (${tableList}). This HLD was generated deterministically from extracted lineage data.`,
+    modules,
+    dataFlow,
+    architecture: "Layered (HTTP → Handler → DB)",
+  };
+}
+
 async function buildContextText(projectId: string): Promise<{ text: string; chunkCount: number }> {
   const queries = ["authentication logic", "order processing", "user management", "data access", "business logic"];
   const seen = new Set<string>();
@@ -149,6 +221,11 @@ export async function generateHld(projectId: string): Promise<HldDocument> {
     throw new Error("No APIs found for this project. Run analyze first.");
   }
 
+  // Fetch all supporting data in parallel (needed by both LLM and deterministic paths)
+  const tableMaps = await lineageRepo.getApiTableMaps(projectId);
+  const schemaTables = await dbSchemaRepo.getTablesForProject(projectId).catch(() => []);
+  const schemaTableNames = (schemaTables ?? []).map((t) => t.name);
+
   const [{ text: lineageText, apiCount }, schemaText, { text: contextText, chunkCount }] = await Promise.all([
     buildLineageText(projectId),
     buildSchemaText(projectId),
@@ -166,37 +243,39 @@ export async function generateHld(projectId: string): Promise<HldDocument> {
     "[HLD] Prompt built",
   );
 
-  let rawOutput: llmService.LlmHldOutput | null = null;
-  let llmAttempts = 0;
-  let validationFailures = 0;
-
-  const raw = await llmService.generate(promptText, {
-    promptName: "hld_analysis",
-    promptVersion,
-    projectId,
-    maxTokens: 2048,
-  });
-  llmAttempts++;
+  let processed: llmService.LlmHldOutput;
+  let usedFallback = false;
 
   try {
-    rawOutput = llmService.parseHldOutput(raw);
+    const raw = await llmService.generate(promptText, {
+      promptName: "hld_analysis",
+      promptVersion,
+      projectId,
+      maxTokens: 2048,
+    });
+
+    const rawOutput = llmService.parseHldOutput(raw);
+    logger.info({ projectId, rawModules: rawOutput.modules.length }, "[HLD] LLM output parsed");
+    processed = postProcess(rawOutput, apis.map((a) => ({ method: a.method, path: a.path })));
   } catch (err) {
-    validationFailures++;
-    logger.warn({ projectId, err: String(err) }, "[HLD] LLM output validation failed");
-    throw new Error(`HLD generation failed: ${String(err)}`);
+    logger.warn(
+      { projectId, err: String(err) },
+      "[HLD] LLM unavailable — using deterministic fallback",
+    );
+    processed = buildDeterministicHld(apis, tableMaps, schemaTableNames);
+    usedFallback = true;
+    // Override promptVersion to indicate fallback
+    (processed as llmService.LlmHldOutput & { _fallback?: boolean })._fallback = true;
   }
-
-  logger.info({ projectId, llmAttempts, validationFailures, rawModules: rawOutput.modules.length }, "[HLD] LLM output parsed");
-
-  const processed = postProcess(rawOutput, apis.map((a) => ({ method: a.method, path: a.path })));
 
   await prdRepo.deleteDocumentsByProjectAndType(projectId, HLD_DOC_TYPE);
 
-  const content = JSON.stringify({ ...processed, promptVersion });
+  const effectiveVersion = usedFallback ? "deterministic-v1" : promptVersion;
+  const content = JSON.stringify({ ...processed, promptVersion: effectiveVersion });
   const doc = await prdRepo.insertDocument(projectId, HLD_DOC_TYPE, "High-Level Design", content);
 
   logger.info(
-    { projectId, docId: doc.id, modules: processed.modules.length, dataFlow: processed.dataFlow.length },
+    { projectId, docId: doc.id, modules: processed.modules.length, dataFlow: processed.dataFlow.length, usedFallback },
     "[HLD] Document stored",
   );
 
@@ -207,7 +286,7 @@ export async function generateHld(projectId: string): Promise<HldDocument> {
     modules: processed.modules,
     dataFlow: processed.dataFlow,
     architecture: processed.architecture,
-    promptVersion,
+    promptVersion: effectiveVersion,
     createdAt: doc.created_at,
   };
 }
