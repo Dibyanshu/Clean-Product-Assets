@@ -1,6 +1,7 @@
 import { logger } from "../../../lib/logger.js";
 import * as ingestionRepo from "../repository/ingestion.repository.js";
 import * as chroma from "../../../services/chroma.service.js";
+import { extractChunks } from "../../../services/ast/astChunker.service.js";
 
 const MOCK_FILE_TREE = [
   { path: "src/index.js", extension: ".js", size: 1240 },
@@ -11,6 +12,9 @@ const MOCK_FILE_TREE = [
   { path: "src/models/Product.js", extension: ".js", size: 2100 },
   { path: "src/services/emailService.js", extension: ".js", size: 1500 },
   { path: "src/config/database.js", extension: ".js", size: 680 },
+  { path: "src/repositories/UserRepository.java", extension: ".java", size: 2600 },
+  { path: "src/controllers/ProductsController.cs", extension: ".cs", size: 2200 },
+  { path: "sql/schema.sql", extension: ".sql", size: 1900 },
   { path: "package.json", extension: ".json", size: 720 },
   { path: "README.md", extension: ".md", size: 3400 },
 ];
@@ -166,6 +170,139 @@ function run(sql, params = []) {
 }
 module.exports = { query, run };`,
 
+  "src/repositories/UserRepository.java": `package com.legacyshop.repositories;
+
+import com.legacyshop.models.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class UserRepository extends JpaRepository<User, String> {
+
+    @Query("SELECT u FROM User u WHERE u.email = :email")
+    public User findByEmail(String email) {
+        return userRepository.findOne(email);
+    }
+
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
+    @Query("SELECT u FROM User u WHERE u.role = 'admin' AND u.active = true")
+    public List<User> findActiveAdmins() {
+        return userRepository.findAll(isAdmin());
+    }
+}`,
+
+  "src/controllers/ProductsController.cs": `using Microsoft.AspNetCore.Mvc;
+using LegacyShop.Models;
+using LegacyShop.Services;
+
+namespace LegacyShop.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ProductsController : ControllerBase
+    {
+        private readonly IProductService _productService;
+
+        public ProductsController(IProductService productService)
+        {
+            _productService = productService;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] string? category)
+        {
+            var products = await _productService.GetAllAsync(category);
+            return Ok(products);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(string id)
+        {
+            var product = await _productService.GetByIdAsync(id);
+            if (product == null) return NotFound();
+            return Ok(product);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var product = await _productService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(string id, [FromBody] UpdateProductDto dto)
+        {
+            var product = await _productService.UpdateAsync(id, dto);
+            if (product == null) return NotFound();
+            return Ok(product);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(string id)
+        {
+            var success = await _productService.DeleteAsync(id);
+            if (!success) return NotFound();
+            return NoContent();
+        }
+    }
+}`,
+
+  "sql/schema.sql": `-- Legacy shop database schema
+
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  display_name TEXT,
+  role TEXT NOT NULL DEFAULT 'user',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE products (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  price REAL NOT NULL,
+  stock_count INTEGER NOT NULL DEFAULT 0,
+  category TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE orders (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'pending',
+  total_amount REAL NOT NULL,
+  shipping_address TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE order_items (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES orders(id),
+  product_id TEXT NOT NULL REFERENCES products(id),
+  quantity INTEGER NOT NULL,
+  unit_price REAL NOT NULL
+);
+
+CREATE FUNCTION calculate_order_total(order_id TEXT)
+RETURNS REAL AS $$
+  SELECT SUM(quantity * unit_price) FROM order_items WHERE order_id = order_id;
+$$ LANGUAGE sql;
+
+CREATE PROCEDURE update_product_stock(p_product_id TEXT, p_delta INTEGER)
+BEGIN
+  UPDATE products SET stock_count = stock_count + p_delta WHERE id = p_product_id;
+END;`,
+
   "package.json": `{
   "name": "legacy-shop",
   "version": "1.0.0",
@@ -180,25 +317,16 @@ module.exports = { query, run };`,
 }`,
 
   "README.md": `# Legacy Shop
-A legacy e-commerce backend built with Express.js and SQLite.
+A legacy e-commerce backend in Express.js + SQLite with Java/C# service layer.
 ## Features
 - User management (CRUD)
 - Product catalog with category filtering
-- JWT authentication middleware
-- Order management
-- Email notifications
-## Setup
-npm install && npm start
+- JWT authentication
+- Java Spring Data repository layer
+- .NET ASP.NET Core controllers
+- Order management with SQL stored procedures
 `,
 };
-
-function chunkContent(content: string, chunkSize = 600): string[] {
-  const chunks: string[] = [];
-  for (let i = 0; i < content.length; i += chunkSize) {
-    chunks.push(content.slice(i, i + chunkSize).trim());
-  }
-  return chunks.filter((c) => c.length > 20);
-}
 
 export interface IngestResult {
   projectId: string;
@@ -225,24 +353,42 @@ export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
   await ingestionRepo.updateProjectStatus(project.id, "ingested", files.length);
   logger.info({ projectId: project.id, fileCount: files.length }, "[IngestionAgent] Ingestion complete");
 
-  // --- Vector store: chunk each file and upsert ---
+  // --- AST-based chunking → vector store ---
   chroma.createOrGetCollection(project.id);
   const docs: Parameters<typeof chroma.upsertDocuments>[1] = [];
+  const langStats: Record<string, number> = {};
 
   for (const f of MOCK_FILE_TREE) {
-    const content = MOCK_FILE_CONTENT[f.path] ?? `// ${f.path}`;
-    const chunks = chunkContent(content);
-    chunks.forEach((chunk, idx) => {
+    const content = MOCK_FILE_CONTENT[f.path];
+    if (!content) continue;
+
+    const chunks = extractChunks(f.path, content);
+
+    if (chunks.length > 0) {
+      for (const chunk of chunks) {
+        docs.push({
+          id: chunk.id,
+          content: chunk.content,
+          metadata: chunk.metadata as Parameters<typeof chroma.upsertDocuments>[1][0]["metadata"],
+        });
+        langStats[chunk.metadata.language] = (langStats[chunk.metadata.language] ?? 0) + 1;
+      }
+    } else {
+      // Non-parseable files (JSON, MD, etc.) — simple 500-char chunks
+      const words = content.slice(0, 1500);
       docs.push({
-        id: `${project.id}::${f.path}::${idx}`,
-        content: chunk,
+        id: `${project.id}::raw::${f.path}`,
+        content: words,
         metadata: { type: "code", file: f.path },
       });
-    });
+    }
   }
 
   chroma.upsertDocuments(project.id, docs);
-  logger.info({ projectId: project.id, chunks: docs.length }, "[IngestionAgent] Code chunks indexed in vector store");
+  logger.info(
+    { projectId: project.id, chunks: docs.length, languages: langStats },
+    "[IngestionAgent] AST chunks indexed in vector store",
+  );
 
   return { projectId: project.id, projectName: repoName, fileCount: files.length, files };
 }

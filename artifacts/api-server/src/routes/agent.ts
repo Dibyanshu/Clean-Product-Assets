@@ -17,6 +17,7 @@ import {
   getDbSchemaHandler,
 } from "../modules/db-schema/controller/dbSchema.controller.js";
 import { searchHandler } from "../modules/search/controller/search.controller.js";
+import { testAstMultiHandler } from "../modules/ast-test/controller/astTest.controller.js";
 import { listJobs, getJob } from "../utils/jobTracker.js";
 
 const agentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -34,6 +35,7 @@ const agentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/agent/projects/:projectId/db-schema", getDbSchemaHandler);
 
   fastify.get("/agent/search", searchHandler);
+  fastify.post("/agent/test-ast-multi", testAstMultiHandler);
 
   fastify.get("/agent/jobs", async (_request, reply) => {
     return reply.send({ jobs: listJobs() });

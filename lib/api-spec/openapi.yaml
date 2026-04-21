@@ -294,6 +294,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /agent/test-ast-multi:
+    post:
+      operationId: testAstMulti
+      tags: [search]
+      summary: Test AST-based multi-language code chunking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AstTestRequest"
+      responses:
+        "200":
+          description: Extracted AST chunks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AstTestResponse"
+        "400":
+          description: Unsupported file type or missing fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /agent/search:
     get:
       operationId: semanticSearch
@@ -594,6 +619,71 @@ components:
           type: string
           nullable: true
       required: [id, agentType, status, message, startedAt]
+
+    AstTestRequest:
+      type: object
+      properties:
+        filePath:
+          type: string
+          description: "File path including extension (e.g. src/foo.java)"
+        code:
+          type: string
+          description: Source code to parse
+      required: [filePath, code]
+
+    AstChunkMetadata:
+      type: object
+      properties:
+        type:
+          type: string
+        name:
+          type: string
+        file:
+          type: string
+        language:
+          type: string
+        route:
+          type: string
+          nullable: true
+        method:
+          type: string
+          nullable: true
+        lineStart:
+          type: integer
+          nullable: true
+        lineEnd:
+          type: integer
+          nullable: true
+        className:
+          type: string
+          nullable: true
+      required: [type, name, file, language]
+
+    AstChunkItem:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/AstChunkMetadata"
+      required: [id, content, metadata]
+
+    AstTestResponse:
+      type: object
+      properties:
+        filePath:
+          type: string
+        language:
+          type: string
+        chunkCount:
+          type: integer
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstChunkItem"
+      required: [filePath, language, chunkCount, chunks]
 
     SearchResultItem:
       type: object

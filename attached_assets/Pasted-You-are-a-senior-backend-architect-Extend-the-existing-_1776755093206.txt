@@ -1,0 +1,237 @@
+You are a senior backend architect. Extend the existing Fastify-based Node.js backend to implement **multi-language AST-based chunking** for:
+
+* JavaScript / TypeScript
+* Java
+* C# (.NET)
+* SQL
+
+This must be implemented using a **pluggable architecture**, not a single parser.
+
+---
+
+# 🎯 OBJECTIVE
+
+Enable the system to:
+
+* Parse multiple languages
+* Extract meaningful code units (functions, classes, APIs, SQL objects)
+* Normalize them into a common chunk format
+* Store them in ChromaDB
+
+---
+
+# 📦 INSTALL DEPENDENCIES
+
+### JS/TS
+
+* @babel/parser
+* @babel/traverse
+
+### Multi-language parsing
+
+* tree-sitter
+* tree-sitter-javascript
+* tree-sitter-typescript
+* tree-sitter-java
+* tree-sitter-c-sharp
+* tree-sitter-sql
+
+---
+
+# 🧱 CREATE STRUCTURE
+
+/services/ast
+astChunker.service.ts   (main orchestrator)
+jsChunker.ts
+javaChunker.ts
+csharpChunker.ts
+sqlChunker.ts
+
+---
+
+# 🧠 CORE DESIGN
+
+## 1. Main Orchestrator
+
+astChunker.service.ts
+
+Function:
+
+extractChunks(filePath, content)
+
+* Detect language from extension:
+
+  * .js, .ts → JS chunker
+  * .java → Java chunker
+  * .cs → C# chunker
+  * .sql → SQL chunker
+
+* Call respective chunker
+
+* Return normalized chunks
+
+---
+
+# 📦 COMMON CHUNK FORMAT
+
+```ts
+{
+  id: string,
+  content: string,
+  metadata: {
+    type: string,
+    name: string,
+    file: string,
+    language: string,
+    route?: string,
+    method?: string
+  }
+}
+```
+
+---
+
+# 🔧 LANGUAGE-SPECIFIC IMPLEMENTATION
+
+## JS/TS (Babel-based)
+
+Extract:
+
+* FunctionDeclaration
+* Arrow functions
+* Class methods
+* Express/Fastify routes
+
+---
+
+## Java (tree-sitter)
+
+Extract:
+
+* class_declaration
+* method_declaration
+
+Metadata:
+
+* class name
+* method name
+
+---
+
+## C# (.NET)
+
+Extract:
+
+* class_declaration
+* method_declaration
+
+Also detect:
+
+* Controllers (class name ends with Controller)
+* API routes (attributes like [HttpGet], [HttpPost])
+
+---
+
+## SQL
+
+Extract:
+
+* CREATE TABLE
+* CREATE PROCEDURE
+* CREATE FUNCTION
+
+Metadata:
+
+* object type
+* name
+
+---
+
+# ✂️ CONTENT EXTRACTION
+
+Use node startIndex and endIndex to slice original content.
+
+DO NOT reconstruct code manually.
+
+---
+
+# 🔌 INTEGRATION
+
+## Update ingestion pipeline
+
+For each file:
+
+```ts
+const chunks = astChunker.extractChunks(filePath, content);
+await chromaService.upsertDocuments(projectId, chunks);
+```
+
+---
+
+# ⚠️ FILE FILTERING
+
+Ignore:
+
+* node_modules
+* build
+* dist
+* bin
+* obj
+
+Only process:
+
+* .js, .ts, .java, .cs, .sql
+
+---
+
+# 🧪 ADD TEST ENDPOINT
+
+POST /agent/test-ast-multi
+
+Input:
+
+```json
+{
+  "filePath": "string",
+  "code": "string"
+}
+```
+
+Returns:
+
+* extracted chunks
+
+---
+
+# 📈 SUCCESS CRITERIA
+
+* Each language produces meaningful chunks
+* API routes detected (Node + .NET)
+* SQL tables/functions extracted
+* No broken fragments
+* Chunks stored in Chroma with language metadata
+
+---
+
+# ⚠️ IMPORTANT RULES
+
+* DO NOT mix logic across chunkers
+* Each language must have its own file
+* KEEP orchestrator clean
+* HANDLE parser failures gracefully
+
+---
+
+# BONUS
+
+* Add line numbers in metadata
+* Add import/dependency extraction
+* Link API → method → DB (future-ready)
+
+---
+
+# EXPLAIN
+
+1. How language detection works
+2. What nodes were extracted per language
+3. How this improves multi-language analysis

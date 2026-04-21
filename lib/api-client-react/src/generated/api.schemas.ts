@@ -139,6 +139,38 @@ export interface Job {
   error?: string | null;
 }
 
+export interface AstTestRequest {
+  /** File path including extension (e.g. src/foo.java) */
+  filePath: string;
+  /** Source code to parse */
+  code: string;
+}
+
+export interface AstChunkMetadata {
+  type: string;
+  name: string;
+  file: string;
+  language: string;
+  route?: string | null;
+  method?: string | null;
+  lineStart?: number | null;
+  lineEnd?: number | null;
+  className?: string | null;
+}
+
+export interface AstChunkItem {
+  id: string;
+  content: string;
+  metadata: AstChunkMetadata;
+}
+
+export interface AstTestResponse {
+  filePath: string;
+  language: string;
+  chunkCount: number;
+  chunks: AstChunkItem[];
+}
+
 export type SearchResultItemMetadata = {
   type: string;
   file?: string | null;

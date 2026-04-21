@@ -19,6 +19,8 @@ import type {
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
+  AstTestRequest,
+  AstTestResponse,
   DbSchemaResult,
   ErrorResponse,
   ExtractDbSchemaRequest,
@@ -1027,6 +1029,92 @@ export function useGetJob<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Test AST-based multi-language code chunking
+ */
+export const getTestAstMultiUrl = () => {
+  return `/api/agent/test-ast-multi`;
+};
+
+export const testAstMulti = async (
+  astTestRequest: AstTestRequest,
+  options?: RequestInit,
+): Promise<AstTestResponse> => {
+  return customFetch<AstTestResponse>(getTestAstMultiUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(astTestRequest),
+  });
+};
+
+export const getTestAstMultiMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testAstMulti>>,
+    TError,
+    { data: BodyType<AstTestRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testAstMulti>>,
+  TError,
+  { data: BodyType<AstTestRequest> },
+  TContext
+> => {
+  const mutationKey = ["testAstMulti"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testAstMulti>>,
+    { data: BodyType<AstTestRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return testAstMulti(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TestAstMultiMutationResult = NonNullable<
+  Awaited<ReturnType<typeof testAstMulti>>
+>;
+export type TestAstMultiMutationBody = BodyType<AstTestRequest>;
+export type TestAstMultiMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Test AST-based multi-language code chunking
+ */
+export const useTestAstMulti = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testAstMulti>>,
+    TError,
+    { data: BodyType<AstTestRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof testAstMulti>>,
+  TError,
+  { data: BodyType<AstTestRequest> },
+  TContext
+> => {
+  return useMutation(getTestAstMultiMutationOptions(options));
+};
 
 /**
  * @summary Semantic vector search over indexed code and schema

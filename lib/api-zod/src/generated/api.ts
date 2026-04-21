@@ -190,6 +190,39 @@ export const GetJobResponse = zod.object({
 });
 
 /**
+ * @summary Test AST-based multi-language code chunking
+ */
+export const TestAstMultiBody = zod.object({
+  filePath: zod
+    .string()
+    .describe("File path including extension (e.g. src\/foo.java)"),
+  code: zod.string().describe("Source code to parse"),
+});
+
+export const TestAstMultiResponse = zod.object({
+  filePath: zod.string(),
+  language: zod.string(),
+  chunkCount: zod.number(),
+  chunks: zod.array(
+    zod.object({
+      id: zod.string(),
+      content: zod.string(),
+      metadata: zod.object({
+        type: zod.string(),
+        name: zod.string(),
+        file: zod.string(),
+        language: zod.string(),
+        route: zod.string().nullish(),
+        method: zod.string().nullish(),
+        lineStart: zod.number().nullish(),
+        lineEnd: zod.number().nullish(),
+        className: zod.string().nullish(),
+      }),
+    }),
+  ),
+});
+
+/**
  * @summary Semantic vector search over indexed code and schema
  */
 export const semanticSearchQueryNDefault = 5;
