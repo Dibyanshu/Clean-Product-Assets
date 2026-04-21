@@ -1,11 +1,12 @@
 import { useGetProject, useListApis, useListDocuments, useListJobs } from "@workspace/api-client-react";
 import { DbSchemaTab } from "@/components/db-schema-tab";
+import { SemanticSearchPanel } from "@/components/semantic-search-panel";
 import { useParams } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Activity, Server, Clock, GitBranch, TerminalSquare, Search, ChevronLeft, Database } from "lucide-react";
+import { FileText, Activity, Server, GitBranch, TerminalSquare, Search, ChevronLeft, Database, Cpu } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -88,6 +89,10 @@ export function ProjectDetail() {
           <TabsTrigger value="prd" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-prd">
             <FileText className="w-3 h-3 mr-2" />
             Generated PRD
+          </TabsTrigger>
+          <TabsTrigger value="search" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-search">
+            <Cpu className="w-3 h-3 mr-2" />
+            Vector Search
           </TabsTrigger>
           <TabsTrigger value="jobs" className="rounded-none data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-b-primary font-mono text-xs uppercase px-6 py-3" data-testid="tab-jobs">
             <Activity className="w-3 h-3 mr-2" />
@@ -224,6 +229,14 @@ export function ProjectDetail() {
                 </div>
               </div>
             )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="search" className="mt-0">
+          <Card className="border-border/50 bg-card/50 backdrop-blur rounded-none">
+            <CardContent className="p-6">
+              <SemanticSearchPanel projectId={id!} />
+            </CardContent>
           </Card>
         </TabsContent>
 

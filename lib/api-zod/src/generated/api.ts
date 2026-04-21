@@ -188,3 +188,34 @@ export const GetJobResponse = zod.object({
   completedAt: zod.string().nullish(),
   error: zod.string().nullish(),
 });
+
+/**
+ * @summary Semantic vector search over indexed code and schema
+ */
+export const semanticSearchQueryNDefault = 5;
+
+export const SemanticSearchQueryParams = zod.object({
+  projectId: zod.coerce.string().describe("Project ID to search within"),
+  q: zod.coerce.string().describe("Natural language search query"),
+  n: zod.coerce
+    .number()
+    .default(semanticSearchQueryNDefault)
+    .describe("Max results to return (1–20)"),
+});
+
+export const SemanticSearchResponse = zod.object({
+  projectId: zod.string(),
+  query: zod.string(),
+  indexedDocuments: zod.number(),
+  results: zod.array(
+    zod.object({
+      id: zod.string(),
+      content: zod.string(),
+      metadata: zod.object({
+        type: zod.string(),
+        file: zod.string().nullish(),
+      }),
+      score: zod.number(),
+    }),
+  ),
+});

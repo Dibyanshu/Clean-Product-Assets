@@ -139,6 +139,25 @@ export interface Job {
   error?: string | null;
 }
 
+export type SearchResultItemMetadata = {
+  type: string;
+  file?: string | null;
+};
+
+export interface SearchResultItem {
+  id: string;
+  content: string;
+  metadata: SearchResultItemMetadata;
+  score: number;
+}
+
+export interface SearchResponse {
+  projectId: string;
+  query: string;
+  indexedDocuments: number;
+  results: SearchResultItem[];
+}
+
 export type ListProjects200 = {
   projects: Project[];
 };
@@ -153,4 +172,19 @@ export type ListDocuments200 = {
 
 export type ListJobs200 = {
   jobs: Job[];
+};
+
+export type SemanticSearchParams = {
+  /**
+   * Project ID to search within
+   */
+  projectId: string;
+  /**
+   * Natural language search query
+   */
+  q: string;
+  /**
+   * Max results to return (1–20)
+   */
+  n?: number;
 };

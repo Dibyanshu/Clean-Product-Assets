@@ -29,3 +29,7 @@ export * from "./listDocuments200";
 export * from "./listJobs200";
 export * from "./listProjects200";
 export * from "./project";
+export * from "./searchResponse";
+export * from "./searchResultItem";
+export * from "./searchResultItemMetadata";
+export * from "./semanticSearchParams";

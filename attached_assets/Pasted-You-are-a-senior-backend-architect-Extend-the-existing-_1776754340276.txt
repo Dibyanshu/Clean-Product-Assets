@@ -1,0 +1,214 @@
+You are a senior backend architect. Extend the existing Node.js + Fastify application to integrate **ChromaDB (vector database)** for semantic code understanding.
+
+This must be implemented cleanly with:
+
+* Service layer abstraction
+* Proper data flow
+* No breaking existing features
+
+---
+
+# 🎯 OBJECTIVE
+
+Enable the system to:
+
+1. Store embeddings of code files and DB schema
+2. Perform semantic search
+3. Provide context to future AI agents (analysis, PRD, etc.)
+
+---
+
+# 🧱 ARCHITECTURE ADDITION
+
+Add a new layer:
+
+/services
+chroma.service.ts
+
+This will act as the **vector memory layer**
+
+---
+
+# ⚙️ SETUP CHROMA
+
+## Option 1 (Recommended for POC)
+
+Run Chroma as a separate service (Docker or hosted)
+
+Use REST API:
+
+* http://localhost:8000
+
+---
+
+# 📦 INSTALL DEPENDENCIES
+
+* axios (for REST calls)
+* uuid
+
+---
+
+# 🧠 CORE CONCEPT
+
+Each project will have its own **collection** in Chroma.
+
+Collection name:
+👉 project_{projectId}
+
+---
+
+# 🧩 IMPLEMENT CHROMA SERVICE
+
+Create:
+
+/services/chroma.service.ts
+
+Functions:
+
+### 1. createCollection(projectId)
+
+* Create or get collection
+
+---
+
+### 2. upsertDocuments(projectId, documents)
+
+Input:
+
+```json
+[
+  {
+    "id": "string",
+    "content": "code or schema text",
+    "metadata": {
+      "type": "code | schema | api",
+      "file": "file path"
+    }
+  }
+]
+```
+
+---
+
+### 3. queryDocuments(projectId, query)
+
+Returns:
+
+* top relevant chunks
+
+---
+
+# 🔍 INTEGRATION POINTS
+
+## 1. Ingestion Agent (IMPORTANT)
+
+After repo parsing:
+
+* Read files
+* Chunk content (500–1000 chars)
+* Call:
+  chroma.upsertDocuments()
+
+---
+
+## 2. DB Schema Agent
+
+After extracting schema:
+
+* Convert tables to text:
+
+Example:
+"Table users: id INT primary key, email TEXT"
+
+* Store in Chroma
+
+---
+
+## 3. Analysis Agent (CRITICAL)
+
+Before LLM call:
+
+* Query Chroma:
+
+```ts
+const context = await chroma.queryDocuments(projectId, "find authentication logic");
+```
+
+* Inject context into LLM prompt
+
+---
+
+# 🧪 ADD NEW ENDPOINT
+
+GET /agent/search
+
+Query params:
+
+* projectId
+* q (query)
+
+Returns:
+
+* relevant code snippets
+
+---
+
+# 📦 RESPONSE FORMAT
+
+```json
+{
+  "results": [
+    {
+      "content": "code snippet",
+      "metadata": {
+        "file": "user.controller.ts"
+      }
+    }
+  ]
+}
+```
+
+---
+
+# ✂️ CHUNKING STRATEGY
+
+* Split by:
+
+  * functions
+  * classes
+  * or fallback to fixed size
+* Avoid huge chunks
+
+---
+
+# ⚠️ IMPORTANT RULES
+
+* DO NOT embed entire files blindly
+* DO NOT store duplicates
+* ALWAYS include metadata
+* KEEP chroma logic isolated in service
+
+---
+
+# 🎯 SUCCESS CRITERIA
+
+* Code is stored in Chroma
+* Schema is stored in Chroma
+* Query returns meaningful results
+* Analysis agent uses context
+
+---
+
+# BONUS
+
+* Add embedding caching
+* Add “re-index project” button
+* Add similarity score in response
+
+---
+
+# EXPLAIN
+
+1. How Chroma is connected
+2. How data flows from ingestion → vector DB
+3. How analysis uses semantic search

@@ -1,6 +1,7 @@
 import { logger } from "../../../lib/logger.js";
 import * as repo from "../repository/dbSchema.repository.js";
 import * as ingestionRepo from "../../ingestion/repository/ingestion.repository.js";
+import * as chroma from "../../../services/chroma.service.js";
 
 export interface SchemaColumn {
   id: string;
@@ -172,6 +173,32 @@ export async function extractSchema(projectId: string): Promise<ExtractResult> {
   }
 
   logger.info({ projectId, tables: tables.length, functions: functions.length }, "[DBSchemaAgent] Extraction complete");
+
+  // --- Vector store: serialise schema to text and upsert ---
+  chroma.createOrGetCollection(projectId);
+  const schemaDocs: Parameters<typeof chroma.upsertDocuments>[1] = [];
+
+  for (const t of tables) {
+    const colText = t.columns
+      .map((c) => `${c.name} ${c.type}${c.is_primary ? " PRIMARY KEY" : ""}${c.is_nullable ? "" : " NOT NULL"}`)
+      .join(", ");
+    schemaDocs.push({
+      id: `${projectId}::schema::table::${t.name}`,
+      content: `Table ${t.name}: ${colText}`,
+      metadata: { type: "schema", file: `schema/tables/${t.name}` },
+    });
+  }
+
+  for (const fn of functions) {
+    schemaDocs.push({
+      id: `${projectId}::schema::fn::${fn.name}`,
+      content: `Function ${fn.name}(${fn.parameters ?? ""}) — ${fn.description ?? ""}`,
+      metadata: { type: "schema", file: `schema/functions/${fn.name}` },
+    });
+  }
+
+  chroma.upsertDocuments(projectId, schemaDocs);
+  logger.info({ projectId, schemaChunks: schemaDocs.length }, "[DBSchemaAgent] Schema indexed in vector store");
 
   return { projectId, tables, functions, extractedAt };
 }

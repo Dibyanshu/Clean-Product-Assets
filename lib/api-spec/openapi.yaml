@@ -20,6 +20,8 @@ tags:
     description: Database schema extraction agent
   - name: jobs
     description: Job status tracking
+  - name: search
+    description: Semantic vector search across code and schema
 
 paths:
   /healthz:
@@ -292,6 +294,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /agent/search:
+    get:
+      operationId: semanticSearch
+      tags: [search]
+      summary: Semantic vector search over indexed code and schema
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+          description: Project ID to search within
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          description: Natural language search query
+        - in: query
+          name: n
+          required: false
+          schema:
+            type: integer
+            default: 5
+          description: Max results to return (1–20)
+      responses:
+        "200":
+          description: Semantic search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          description: Missing required parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -547,3 +594,38 @@ components:
           type: string
           nullable: true
       required: [id, agentType, status, message, startedAt]
+
+    SearchResultItem:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        metadata:
+          type: object
+          properties:
+            type:
+              type: string
+            file:
+              type: string
+              nullable: true
+          required: [type]
+        score:
+          type: number
+      required: [id, content, metadata, score]
+
+    SearchResponse:
+      type: object
+      properties:
+        projectId:
+          type: string
+        query:
+          type: string
+        indexedDocuments:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResultItem"
+      required: [projectId, query, indexedDocuments, results]

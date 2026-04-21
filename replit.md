@@ -21,6 +21,8 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 
 - **Controller → Service → Repository** pattern
 - Four AI agents: Ingestion, Analysis, PRD Generator, DB Schema Extractor
+- In-memory vector store (TF-IDF cosine similarity, ChromaDB-compatible interface)
+- Semantic search endpoint: `GET /api/agent/search?projectId=&q=`
 - In-memory job status tracker
 - Mock LLM service for PRD generation
 - Mock schema extraction (tables, columns, functions)

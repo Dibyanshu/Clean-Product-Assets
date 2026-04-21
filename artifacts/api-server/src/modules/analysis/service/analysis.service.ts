@@ -1,6 +1,7 @@
 import { logger } from "../../../lib/logger.js";
 import * as ingestionRepo from "../../ingestion/repository/ingestion.repository.js";
 import * as analysisRepo from "../repository/analysis.repository.js";
+import * as chroma from "../../../services/chroma.service.js";
 
 const ROUTE_PATTERNS = [
   { method: "GET", pathTemplate: "/api/users", description: "List all users", handler: "UserController.list" },
@@ -19,6 +20,7 @@ export interface AnalysisResult {
   projectId: string;
   apiCount: number;
   apis: analysisRepo.ApiRoute[];
+  semanticContext?: string[];
 }
 
 export async function analyzeProject(projectId: string): Promise<AnalysisResult> {
@@ -30,6 +32,22 @@ export async function analyzeProject(projectId: string): Promise<AnalysisResult>
 
   const files = await ingestionRepo.listFilesByProject(projectId);
   logger.info({ projectId, fileCount: files.length }, "[AnalysisAgent] Files loaded, extracting routes");
+
+  // --- Query vector store for authentication and routing context ---
+  const contextQueries = ["authentication middleware JWT token", "route handler express router"];
+  const semanticContext: string[] = [];
+
+  for (const query of contextQueries) {
+    const hits = chroma.queryDocuments(projectId, query, 3);
+    if (hits.length > 0) {
+      logger.info({ projectId, query, hits: hits.length }, "[AnalysisAgent] Semantic context retrieved");
+      for (const h of hits) {
+        semanticContext.push(`[${h.metadata.file ?? "unknown"} score=${h.score}] ${h.content.slice(0, 120)}`);
+      }
+    }
+  }
+
+  logger.info({ projectId, contextChunks: semanticContext.length }, "[AnalysisAgent] Context injected into analysis");
 
   await analysisRepo.deleteApisByProject(projectId);
 
@@ -50,7 +68,7 @@ export async function analyzeProject(projectId: string): Promise<AnalysisResult>
   }
 
   logger.info({ projectId, apiCount: apis.length }, "[AnalysisAgent] Analysis complete");
-  return { projectId, apiCount: apis.length, apis };
+  return { projectId, apiCount: apis.length, apis, semanticContext };
 }
 
 export async function getApisByProject(projectId: string) {

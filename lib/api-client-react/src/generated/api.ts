@@ -34,6 +34,8 @@ import type {
   ListJobs200,
   ListProjects200,
   Project,
+  SearchResponse,
+  SemanticSearchParams,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1018,6 +1020,100 @@ export function useGetJob<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetJobQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Semantic vector search over indexed code and schema
+ */
+export const getSemanticSearchUrl = (params: SemanticSearchParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/agent/search?${stringifiedParams}`
+    : `/api/agent/search`;
+};
+
+export const semanticSearch = async (
+  params: SemanticSearchParams,
+  options?: RequestInit,
+): Promise<SearchResponse> => {
+  return customFetch<SearchResponse>(getSemanticSearchUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSemanticSearchQueryKey = (params?: SemanticSearchParams) => {
+  return [`/api/agent/search`, ...(params ? [params] : [])] as const;
+};
+
+export const getSemanticSearchQueryOptions = <
+  TData = Awaited<ReturnType<typeof semanticSearch>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: SemanticSearchParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof semanticSearch>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSemanticSearchQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof semanticSearch>>> = ({
+    signal,
+  }) => semanticSearch(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof semanticSearch>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SemanticSearchQueryResult = NonNullable<
+  Awaited<ReturnType<typeof semanticSearch>>
+>;
+export type SemanticSearchQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Semantic vector search over indexed code and schema
+ */
+
+export function useSemanticSearch<
+  TData = Awaited<ReturnType<typeof semanticSearch>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: SemanticSearchParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof semanticSearch>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSemanticSearchQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
