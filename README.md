@@ -1,6 +1,6 @@
 # ArchonAI — Agentic Legacy Modernization System
 
-A production-grade monorepo that orchestrates multiple AI agents to parse, analyze, and document legacy codebases. Outputs structured API inventories, DB schema maps, PRDs, semantic search, and AI-enhanced API ↔ DB lineage via RAG.
+A production-grade monorepo that orchestrates multiple AI agents to parse, analyze, and document legacy codebases. Outputs structured API inventories, DB schema maps, PRDs, AI-enhanced lineage, and auto-generated High-Level Design documents via RAG.
 
 ---
 
@@ -89,6 +89,37 @@ Extends the deterministic lineage using **Retrieval-Augmented Generation**. For 
 7. **Cache** — stores result by `projectId::apiId::promptVersion`; cache hit skips the LLM call entirely
 8. **Persist** — writes merged entries back to `api_table_map` with `source`, `confidence_level`, and `prompt_version` columns
 
+### Agent 6 — HLD Generator (RAG + LLM)
+Synthesises all prior analysis into a structured **High-Level Design document**. Runs once per project (or on demand), producing module clusters, data flows, and an architecture recommendation.
+
+Generation pipeline:
+
+1. **Guard** — requires at least one extracted API; rejects early with a clear error if analysis hasn't run yet
+2. **Lineage aggregation** — joins `api_table_map` with `apis` to build `METHOD /path → table (OP)` lines (up to 30 APIs)
+3. **Schema context** — fetches up to 25 table names from `db_tables`
+4. **Chroma retrieval** — runs 5 semantic queries ("authentication logic", "order processing", "user management", "data access", "business logic"); deduplicates by content fingerprint; caps at 10 chunks × 350 chars each
+5. **Prompt** — assembles `hld_analysis_v1` with lineage, schema, and code context blocks
+6. **Generate** — calls `gpt-5-mini` with `maxTokens=2048`, retry ×3, 30s timeout
+7. **Validate** — rejects non-object output; rejects if no valid modules returned; normalises table names to lowercase
+8. **Post-process** — deduplicates API assignments across modules; collects any unassigned APIs into an "Other Endpoints" module; validates data flow references
+9. **Persist** — deletes the previous HLD document for this project, stores the new one in `documents` with `type="hld"`
+
+Output shape:
+```json
+{
+  "overview": "E-commerce system serving buyers, sellers, and logistics...",
+  "modules": [
+    {
+      "name": "Order Service",
+      "apis": ["POST /api/orders", "GET /api/orders/{id}"],
+      "tables": ["orders", "order_items"]
+    }
+  ],
+  "dataFlow": ["User Service → Order Service (userId on order creation)"],
+  "architecture": "Modular Monolith"
+}
+```
+
 ---
 
 ## Vector Store
@@ -99,9 +130,10 @@ The interface mirrors the ChromaDB JS client exactly — `createOrGetCollection`
 
 **Data flow:**
 ```
-Ingest  → AST chunks (code)    ─┐
-Schema  → serialised schema    ─┼─► collection[projectId] ──► queryDocuments
-Lineage AI RAG retrieval       ◄─┘
+Ingest   → AST chunks (code)    ─┐
+Schema   → serialised schema    ─┼─► collection[projectId] ──► queryDocuments
+Lineage  → per-API RAG          ◄─┤
+HLD      → multi-query RAG      ◄─┘
 ```
 
 ---
@@ -111,8 +143,8 @@ Lineage AI RAG retrieval       ◄─┘
 | Service | File | Purpose |
 |---|---|---|
 | Vector store | `services/chroma.service.ts` | TF-IDF in-memory vector store, ChromaDB-compatible |
-| LLM | `services/llm.service.ts` | OpenAI client wrapper; retry ×3, 30s timeout, response size guard, structured logging per attempt |
-| Prompt | `services/prompt.service.ts` | Versioned prompt templates; `buildLineagePrompt()` assembles API + chunks + schema + deterministic context |
+| LLM | `services/llm.service.ts` | OpenAI client wrapper; retry ×3, 30s timeout, configurable `maxTokens`, response size guard, structured logging per attempt; `parseLineageOutput` + `parseHldOutput` |
+| Prompt | `services/prompt.service.ts` | Versioned templates: `lineage_analysis_v1` (`buildLineagePrompt`) and `hld_analysis_v1` (`buildHldPrompt`) |
 | Cache | `services/cache.service.ts` | In-memory `Map` keyed by `projectId::apiId::promptVersion`; logs hits/misses; `invalidateProject()` for selective eviction |
 | AST chunker | `services/ast/astChunker.service.ts` | Orchestrates multi-language parsing and chunk production |
 
@@ -164,12 +196,10 @@ curl http://localhost/api/agent/projects/<projectId>/db-schema
 ### Agent 5 — Lineage Mapper (deterministic)
 
 ```bash
-# Generate deterministic lineage
 curl -X POST http://localhost/api/agent/generate-lineage \
   -H "Content-Type: application/json" \
   -d '{"projectId": "<projectId>"}'
 
-# Get stored lineage (includes source/confidence_level after AI enhancement)
 curl "http://localhost/api/agent/lineage?projectId=<projectId>"
 ```
 
@@ -238,14 +268,48 @@ Enhance response:
 }
 ```
 
-Bulk response:
+### Agent 6 — HLD Generator (RAG + LLM)
+
+```bash
+# Generate HLD from lineage + Chroma context
+curl -X POST http://localhost/api/agent/generate-hld \
+  -H "Content-Type: application/json" \
+  -d '{"projectId": "<projectId>"}'
+
+# Retrieve the latest stored HLD
+curl "http://localhost/api/agent/hld?projectId=<projectId>"
+
+# Delete existing HLD and regenerate from latest data
+curl -X POST http://localhost/api/agent/hld/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"projectId": "<projectId>"}'
+```
+
+Response:
 ```json
 {
+  "id": "...",
   "projectId": "...",
-  "processed": 10,
-  "enhanced": 8,
-  "fallback": 2,
-  "results": [...]
+  "overview": "E-commerce platform providing order management, user accounts, and inventory tracking.",
+  "modules": [
+    {
+      "name": "User Management",
+      "apis": ["GET /api/users", "POST /api/users", "DELETE /api/users/{id}"],
+      "tables": ["users", "sessions"]
+    },
+    {
+      "name": "Order Service",
+      "apis": ["POST /api/orders", "GET /api/orders/{id}"],
+      "tables": ["orders", "order_items"]
+    }
+  ],
+  "dataFlow": [
+    "User Management → Order Service (userId on order creation)",
+    "Order Service → Inventory Service (stock reservation)"
+  ],
+  "architecture": "Modular Monolith",
+  "promptVersion": "v1",
+  "createdAt": "2026-04-21T10:30:00.000Z"
 }
 ```
 
@@ -315,7 +379,12 @@ curl -s -X POST http://localhost/api/agent/lineage-ai/bulk \
   -H "Content-Type: application/json" \
   -d "{\"projectId\":\"$PROJECT_ID\"}"
 
-# Step 7: Semantic search
+# Step 7: Generate HLD — groups APIs into logical modules with data flow
+curl -s -X POST http://localhost/api/agent/generate-hld \
+  -H "Content-Type: application/json" \
+  -d "{\"projectId\":\"$PROJECT_ID\"}"
+
+# Step 8: Semantic search
 curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authentication+JWT"
 ```
 
@@ -337,8 +406,8 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 │   │   │   └── migrate.ts                 # Schema migrations (10 tables)
 │   │   ├── services/
 │   │   │   ├── chroma.service.ts          # Vector store (TF-IDF, ChromaDB-compatible)
-│   │   │   ├── llm.service.ts             # OpenAI client: retry ×3, timeout, JSON parser
-│   │   │   ├── prompt.service.ts          # Versioned prompt templates + context builder
+│   │   │   ├── llm.service.ts             # OpenAI client: retry ×3, configurable maxTokens, two output parsers
+│   │   │   ├── prompt.service.ts          # hld_analysis_v1 + lineage_analysis_v1 templates
 │   │   │   ├── cache.service.ts           # In-memory LLM response cache
 │   │   │   └── ast/
 │   │   │       ├── astChunker.service.ts  # Orchestrator — language detection + dispatch
@@ -350,10 +419,11 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 │   │   ├── modules/
 │   │   │   ├── ingestion/                 # Agent 1: ingest + AST-chunk + vector upsert
 │   │   │   ├── analysis/                  # Agent 2: vector query + API extraction
-│   │   │   ├── prd/                       # Agent 3: PRD generation
+│   │   │   ├── prd/                       # Agent 3: PRD generation; shared document repository
 │   │   │   ├── db-schema/                 # Agent 4: schema extraction + vector upsert
 │   │   │   ├── lineage/                   # Agent 5: deterministic lineage mapper
 │   │   │   ├── lineage-ai/                # Agent 5 AI: RAG + LLM lineage enhancer
+│   │   │   ├── hld/                       # Agent 6: HLD generator (RAG + LLM)
 │   │   │   ├── search/                    # GET /agent/search handler
 │   │   │   └── ast-test/                  # POST /agent/test-ast-multi handler
 │   │   ├── routes/
@@ -368,17 +438,18 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 │       ├── pages/
 │       │   ├── dashboard.tsx              # Mission control overview
 │       │   ├── projects-list.tsx          # All projects table
-│       │   ├── project-detail.tsx         # 6-tab project view
+│       │   ├── project-detail.tsx         # 7-tab project view
 │       │   └── jobs-list.tsx              # Global operations log
 │       └── components/
 │           ├── layout.tsx
 │           ├── status-badge.tsx
 │           ├── lineage-tab.tsx            # AI-enhanced lineage viewer with source + confidence badges
+│           ├── hld-tab.tsx                # HLD viewer: module cards, data flow, export JSON
 │           ├── db-schema-tab.tsx          # Accordion schema viewer
 │           └── semantic-search-panel.tsx  # TF-IDF search UI with suggestion pills
 │
 └── lib/
-    ├── api-spec/openapi.yaml              # OpenAPI 3.1 source of truth (1000+ lines)
+    ├── api-spec/openapi.yaml              # OpenAPI 3.1 source of truth (1100+ lines)
     ├── api-client-react/                  # Orval-generated React Query hooks
     ├── api-zod/                           # Orval-generated Zod schemas
     └── integrations-openai-ai-server/     # OpenAI SDK client + batch utilities
@@ -393,7 +464,7 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 | `projects` | Ingested repos with status tracking |
 | `files` | File metadata per project |
 | `apis` | Extracted API routes per project |
-| `documents` | Generated PRD documents |
+| `documents` | Generated documents — PRD (`type="prd"`) and HLD (`type="hld"`) |
 | `db_tables` | Extracted database tables |
 | `db_columns` | Columns per table (type, primary key, nullable) |
 | `db_functions` | Extracted SQL functions and stored procedures |
@@ -419,7 +490,8 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 | **DB Schema** | Accordion tables with column types, primary key icons, nullable flags; function list |
 | **Generated PRD** | Full PRD with executive summary, API inventory, user stories, technical requirements |
 | **Vector Search** | Semantic search across 50+ indexed chunks; results show type, file, score bar |
-| **Lineage** | API → function → table trace; operation badges; confidence% dots; source badges (AI / AI+AST); confidence-level badges (HIGH / MEDIUM / LOW / CONFLICT); per-card "Enhance with AI" button; top-bar "Bulk AI Enhance" and "Refresh Cache" buttons |
+| **Lineage** | API → function → table trace; operation badges; source badges (AI / AI+AST); confidence-level badges (HIGH / MEDIUM / LOW / CONFLICT); per-card "Enhance with AI" button; "Bulk AI Enhance" and "Refresh Cache" top-bar controls |
+| **Generated HLD** | System overview card; module cards grid (color-coded, showing APIs with method badges + table badges); data flow numbered list; top-bar "Generate HLD", "Regenerate", "Export JSON" buttons |
 | **Job History** | All agent runs for this project with status, timing, and messages |
 
 ---
@@ -430,11 +502,12 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 - **Services** — all business logic; call repositories and other services
 - **Repositories** — only DB access; services never touch sql.js directly
 - **Vector store** — isolated in `services/chroma.service.ts`; all agents call it but none own it
-- **LLM service** — isolated in `services/llm.service.ts`; never called directly from controllers or repositories
+- **LLM service** — isolated in `services/llm.service.ts`; never called directly from controllers or repositories; supports per-call `maxTokens` override (1024 for lineage, 2048 for HLD)
 - **Cache service** — in-memory; keyed by `projectId::apiId::promptVersion`; completely transparent to callers (get/set/invalidate)
-- **Prompt service** — versioned templates; prompt version is part of the cache key, ensuring stale cached responses are automatically bypassed on template upgrades
+- **Prompt service** — two versioned templates (`lineage_analysis_v1`, `hld_analysis_v1`); prompt version is part of the cache key, ensuring stale responses are bypassed on template upgrades
+- **Document repository** — shared across PRD and HLD via `type` discriminator; `deleteDocumentsByProjectAndType` + `findLatestDocumentByProjectAndType` helpers
 - **AST chunkers** — one file per language; orchestrator never contains parser logic
-- **Logging** — Pino structured JSON; `req.log` in handlers, singleton `logger` in services; every LLM attempt, cache hit/miss, and chunk count logged
+- **Logging** — Pino structured JSON; `req.log` in handlers, singleton `logger` in services; every LLM attempt, cache hit/miss, chunk count, and validation failure logged
 - **Job tracker** — in-memory `Map<string, Job>` with `pending → running → completed/failed` lifecycle
 - **API contract** — OpenAPI 3.1 spec is the single source of truth; client hooks and Zod schemas are generated, never hand-written
 
@@ -442,16 +515,17 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 
 ## LLM Configuration
 
-| Setting | Value |
-|---|---|
-| Provider | OpenAI via Replit AI Integrations proxy |
-| Model | `gpt-5-mini` |
-| Max output tokens | 1024 |
-| Max retries | 3 (exponential backoff: 1s / 2s / 3s) |
-| Timeout | 30 seconds per attempt |
-| Response size guard | 4096 chars max |
-| Prompt version | `v1` (`lineage_analysis_v1` template) |
-| Fallback | Deterministic lineage returned unchanged if all LLM attempts fail |
+| Setting | Lineage Enhancer | HLD Generator |
+|---|---|---|
+| Model | `gpt-5-mini` | `gpt-5-mini` |
+| Max output tokens | 1024 | 2048 |
+| Max retries | 3 | 3 |
+| Backoff | 1s / 2s / 3s | 1s / 2s / 3s |
+| Timeout | 30s per attempt | 30s per attempt |
+| Response size guard | 4096 chars | 4096 chars |
+| Prompt template | `lineage_analysis_v1` | `hld_analysis_v1` |
+| Fallback | Deterministic lineage returned unchanged | Error returned to caller |
+| Caching | `projectId::apiId::promptVersion` | Not cached (re-generates on each call) |
 
 ---
 

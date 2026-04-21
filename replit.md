@@ -2,7 +2,7 @@
 
 ## Overview
 
-A production-grade backend + React dashboard for orchestrating AI agents to analyze legacy codebases and generate structured outputs (APIs, PRD, DB schema, lineage). Includes AI-enhanced API ↔ DB lineage via RAG (Retrieval-Augmented Generation) using OpenAI.
+A production-grade backend + React dashboard for orchestrating AI agents to analyze legacy codebases and generate structured outputs (APIs, PRD, DB schema, lineage, High-Level Design). Includes AI-enhanced API ↔ DB lineage via RAG and auto-generated HLD documents using OpenAI.
 
 ## Stack
 
@@ -22,10 +22,10 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 ## Architecture
 
 - **Controller → Service → Repository** pattern
-- **Five agents + one AI enhancement layer**: Ingestion, Analysis, PRD Generator, DB Schema Extractor, Lineage Mapper (deterministic), Lineage Enhancer (RAG + LLM)
+- **Six agent roles**: Ingestion, Analysis, PRD Generator, DB Schema Extractor, Lineage Mapper (deterministic), Lineage Enhancer (RAG + LLM), HLD Generator (RAG + LLM)
 - In-memory vector store (TF-IDF cosine similarity, ChromaDB-compatible interface)
 - Pluggable multi-language AST chunker: JS/TS (Babel real AST), Java, C#, SQL (pattern-based)
-- Shared services layer: `llm.service.ts` (retry + timeout + JSON validation), `prompt.service.ts` (versioned templates), `cache.service.ts` (projectId+apiId+promptVersion key)
+- Shared services: `llm.service.ts` (retry + configurable maxTokens + two output parsers), `prompt.service.ts` (two versioned templates), `cache.service.ts` (lineage cache)
 - Semantic search endpoint: `GET /api/agent/search?projectId=&q=`
 - AST test endpoint: `POST /api/agent/test-ast-multi`
 - In-memory job status tracker
@@ -58,6 +58,9 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 | POST | /api/agent/lineage-ai | Agent 5 AI: RAG+LLM enhance single API lineage |
 | POST | /api/agent/lineage-ai/bulk | Agent 5 AI: Enhance all APIs in a project |
 | POST | /api/agent/lineage-ai/refresh | Clear LLM cache for a project |
+| POST | /api/agent/generate-hld | Agent 6: Generate HLD from lineage + Chroma + LLM |
+| GET | /api/agent/hld | Get the latest stored HLD for a project |
+| POST | /api/agent/hld/refresh | Delete existing HLD and regenerate |
 | GET | /api/agent/search | Semantic vector search |
 | POST | /api/agent/test-ast-multi | Test multi-language AST chunker |
 
@@ -74,6 +77,26 @@ For each API endpoint the enhancer runs:
 8. Write to `api_table_map` with `source`, `confidence_level`, `prompt_version`
 9. Store in cache
 
+## HLD Generator — RAG Flow
+
+Runs once per project, synthesises all prior analysis into a High-Level Design:
+1. Guard: requires ≥1 extracted API
+2. Aggregate lineage: join `api_table_map` + `apis` → `METHOD /path → table (OP)` lines (up to 30)
+3. Fetch schema: up to 25 table names from `db_tables`
+4. Retrieve Chroma context: 5 semantic queries, deduplicated, cap 10 chunks × 350 chars
+5. Build `hld_analysis_v1` prompt with lineage + schema + context
+6. Call `gpt-5-mini` with `maxTokens=2048`, retry ×3, 30s timeout
+7. Validate: must return object with non-empty `modules` array; normalise table names to lowercase
+8. Post-process: deduplicate API assignments, assign unmatched APIs to "Other Endpoints", validate data flow
+9. Delete prior HLD for this project; store in `documents` with `type="hld"`
+
+## Prompt Templates
+
+| Template | Used by | maxTokens | Purpose |
+|---|---|---|---|
+| `lineage_analysis_v1` | Lineage Enhancer | 1024 | Per-API table + operation mapping |
+| `hld_analysis_v1` | HLD Generator | 2048 | Full system module clustering + data flow |
+
 ## Folder Structure
 
 ```
@@ -88,17 +111,18 @@ artifacts/api-server/src/
 │   └── migrate.ts
 ├── services/
 │   ├── chroma.service.ts      # Vector store
-│   ├── llm.service.ts         # OpenAI wrapper: retry, timeout, JSON validation
-│   ├── prompt.service.ts      # Versioned prompt templates
+│   ├── llm.service.ts         # OpenAI wrapper: retry, configurable maxTokens, parseLineageOutput + parseHldOutput
+│   ├── prompt.service.ts      # lineage_analysis_v1 + hld_analysis_v1 templates
 │   ├── cache.service.ts       # In-memory LLM response cache
 │   └── ast/                   # Multi-language AST chunkers
 ├── modules/
 │   ├── ingestion/             # Agent 1
 │   ├── analysis/              # Agent 2
-│   ├── prd/                   # Agent 3
+│   ├── prd/                   # Agent 3 + shared document repository
 │   ├── db-schema/             # Agent 4
 │   ├── lineage/               # Agent 5: deterministic
-│   ├── lineage-ai/            # Agent 5 AI: RAG + LLM
+│   ├── lineage-ai/            # Agent 5 AI: RAG + LLM per-API enhancer
+│   ├── hld/                   # Agent 6: HLD generator (RAG + LLM, project-level)
 │   ├── search/
 │   └── ast-test/
 ├── routes/
@@ -113,32 +137,36 @@ artifacts/legacy-modernization-ui/src/
 ├── pages/
 │   ├── dashboard.tsx
 │   ├── projects-list.tsx
-│   ├── project-detail.tsx
+│   ├── project-detail.tsx      # 7-tab view (APIs, DB Schema, PRD, Vector Search, Lineage, HLD, Jobs)
 │   └── jobs-list.tsx
 └── components/
     ├── layout.tsx
     ├── status-badge.tsx
-    ├── lineage-tab.tsx         # AI-enhanced lineage UI with source + confidence badges
+    ├── lineage-tab.tsx          # AI-enhanced lineage UI with source + confidence badges
+    ├── hld-tab.tsx              # HLD viewer: module cards, data flow, export JSON
     ├── db-schema-tab.tsx
     └── semantic-search-panel.tsx
 
 lib/
 ├── api-spec/openapi.yaml
-├── api-client-react/           # Orval-generated hooks (incl. useEnhanceLineageAI, useBulkEnhance, useRefreshCache)
+├── api-client-react/            # Orval-generated hooks (incl. useGenerateHld, useGetHld, useRefreshHld)
 ├── api-zod/
-└── integrations-openai-ai-server/   # OpenAI SDK client + batch utilities
+└── integrations-openai-ai-server/
 ```
 
-## Database Schema — api_table_map (extended)
+## Database Schema Notes
 
-| Column | Type | Notes |
+### `documents` table — type discriminator
+
+| `type` value | Generator | Stored by |
 |---|---|---|
-| `id` | TEXT PK | |
-| `project_id` | TEXT | FK → projects |
-| `api_id` | TEXT | FK → apis |
-| `table_name` | TEXT | Lowercase table name |
-| `operation` | TEXT | SELECT / INSERT / UPDATE / DELETE / QUERY |
-| `confidence` | REAL | Float 0–1 (deterministic confidence score) |
+| `"prd"` | Agent 3 PRD Generator | `prd.repository.insertDocument` |
+| `"hld"` | Agent 6 HLD Generator | `prd.repository.insertDocument` + `deleteDocumentsByProjectAndType` |
+
+### `api_table_map` extended columns
+
+| Column | Type | Values |
+|---|---|---|
 | `source` | TEXT | `deterministic` / `llm` / `merged` |
 | `confidence_level` | TEXT | `high` / `medium` / `low` / `conflict` |
 | `prompt_version` | TEXT | e.g. `v1`; NULL for deterministic-only rows |
