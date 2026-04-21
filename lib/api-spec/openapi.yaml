@@ -28,6 +28,8 @@ tags:
     description: LLM-enhanced lineage via RAG (Retrieval-Augmented Generation)
   - name: hld
     description: Auto High-Level Design generation from lineage + RAG context
+  - name: db-admin
+    description: Admin database browser — list tables and query rows
 
 paths:
   /healthz:
@@ -593,6 +595,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/db/tables:
+    get:
+      operationId: listDbTables
+      tags: [db-admin]
+      summary: List all SQLite tables with column info and row counts
+      responses:
+        "200":
+          description: Table list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbTablesResponse"
+
+  /admin/db/tables/{table}/rows:
+    get:
+      operationId: getDbTableRows
+      tags: [db-admin]
+      summary: Query rows from a SQLite table with pagination
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Table name
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Page number (1-indexed)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+          description: Rows per page (max 200)
+      responses:
+        "200":
+          description: Paginated rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbTableRowsResponse"
+        "404":
+          description: Table not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -1153,3 +1208,47 @@ components:
         createdAt:
           type: string
       required: [id, projectId, overview, modules, dataFlow, architecture, promptVersion, createdAt]
+
+    DbTableInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        rowCount:
+          type: integer
+        columns:
+          type: array
+          items:
+            type: string
+      required: [name, rowCount, columns]
+
+    DbTablesResponse:
+      type: object
+      properties:
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/DbTableInfo"
+      required: [tables]
+
+    DbTableRowsResponse:
+      type: object
+      properties:
+        table:
+          type: string
+        columns:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [table, columns, rows, total, page, limit]

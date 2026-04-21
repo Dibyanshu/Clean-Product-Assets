@@ -9,6 +9,7 @@ import { Dashboard } from "@/pages/dashboard";
 import { ProjectsList } from "@/pages/projects-list";
 import { ProjectDetail } from "@/pages/project-detail";
 import { JobsList } from "@/pages/jobs-list";
+import { DbBrowser } from "@/pages/db-browser";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/projects" component={ProjectsList} />
         <Route path="/projects/:id" component={ProjectDetail} />
         <Route path="/jobs" component={JobsList} />
+        <Route path="/db-browser" component={DbBrowser} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

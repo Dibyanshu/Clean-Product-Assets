@@ -22,7 +22,8 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 ## Architecture
 
 - **Controller → Service → Repository** pattern
-- **Six agent roles**: Ingestion, Analysis, PRD Generator, DB Schema Extractor, Lineage Mapper (deterministic), Lineage Enhancer (RAG + LLM), HLD Generator (RAG + LLM)
+- **Seven agent roles**: Ingestion, Analysis, PRD Generator, DB Schema Extractor, Lineage Mapper (deterministic), Lineage Enhancer (RAG + LLM), HLD Generator (RAG + LLM)
+- **DB Browser**: Admin UI at `/db-browser` — live-queries all SQLite tables with paginated row viewer; powered by `GET /api/admin/db/tables` + `GET /api/admin/db/tables/:table/rows`
 - In-memory vector store (TF-IDF cosine similarity, ChromaDB-compatible interface)
 - Pluggable multi-language AST chunker: JS/TS (Babel real AST), Java, C#, SQL (pattern-based)
 - Shared services: `llm.service.ts` (retry + configurable maxTokens + two output parsers), `prompt.service.ts` (two versioned templates), `cache.service.ts` (lineage cache)

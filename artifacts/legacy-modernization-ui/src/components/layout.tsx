@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Terminal, FolderGit2, Activity, Rocket } from "lucide-react";
+import { Terminal, FolderGit2, Activity, Rocket, DatabaseZap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -9,6 +9,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/", label: "Terminal", icon: Terminal },
     { href: "/projects", label: "Projects", icon: FolderGit2 },
     { href: "/jobs", label: "Operations", icon: Activity },
+    { href: "/db-browser", label: "DB Browser", icon: DatabaseZap },
   ];
 
   return (
