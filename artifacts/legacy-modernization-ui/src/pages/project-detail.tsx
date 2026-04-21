@@ -25,6 +25,14 @@ function getMethodColor(method: string) {
   }
 }
 
+function parseDocumentContent(content: string) {
+  try {
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -34,8 +42,12 @@ export function ProjectDetail() {
   const { data: docsData, isLoading: loadingDocs } = useListDocuments(id!);
   const { data: jobsData, isLoading: loadingJobs } = useListJobs();
 
-  // Filter jobs for this project
   const projectJobs = jobsData?.jobs.filter(j => j.projectId === id) || [];
+  const documents = docsData?.documents || [];
+  const prdDoc = documents.find((d) => String(d.type).toLowerCase() === 'prd');
+  const hldDoc = documents.find((d) => String(d.type).toLowerCase() === 'hld');
+  const parsedPrd = prdDoc ? parseDocumentContent(prdDoc.content) : null;
+  const parsedHld = hldDoc ? parseDocumentContent(hldDoc.content) : null;
 
   if (loadingProject) {
     return <div className="p-8 text-center font-mono text-muted-foreground animate-pulse">[RETRIEVING TARGET DATA...]</div>;
@@ -43,16 +55,6 @@ export function ProjectDetail() {
 
   if (!project) {
     return <div className="p-8 text-center font-mono text-destructive">[TARGET NOT FOUND]</div>;
-  }
-
-  const prdDoc = docsData?.documents.find(d => d.type === 'prd');
-  let parsedPrd = null;
-  if (prdDoc) {
-    try {
-      parsedPrd = JSON.parse(prdDoc.content);
-    } catch (e) {
-      // Content might not be JSON, fallback
-    }
   }
 
   return (
@@ -174,14 +176,14 @@ export function ProjectDetail() {
                 <TerminalSquare className="w-8 h-8 mb-4 opacity-50" />
                 NO PRD DOCUMENT GENERATED YET
               </div>
-            ) : (
+            ) : parsedPrd ? (
               <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border/50">
                 <div className="col-span-1 p-6 bg-muted/5">
                   <div className="text-xs font-mono uppercase text-muted-foreground tracking-widest mb-6 border-b border-border/50 pb-2">Document Metadata</div>
                   <div className="space-y-4">
                     <div>
                       <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">Title</div>
-                      <div className="text-sm font-medium">{prdDoc.title}</div>
+                      <div className="text-sm font-medium">{parsedPrd.title || prdDoc.title}</div>
                     </div>
                     <div>
                       <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">Generated</div>
@@ -194,50 +196,29 @@ export function ProjectDetail() {
                   </div>
                 </div>
                 <div className="col-span-3 p-6 md:p-8 bg-background/50">
-                  <div className="prose prose-invert prose-sm md:prose-base max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-foreground prose-a:text-primary prose-code:text-secondary prose-code:bg-secondary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-sm">
-                    {parsedPrd ? (
-                      <div className="space-y-8">
-                        <div>
-                          <h1 className="text-2xl font-bold uppercase tracking-tight border-b border-border/50 pb-2 mb-4 text-primary">System Overview</h1>
-                          <p className="text-foreground/80 leading-relaxed">{parsedPrd.overview || "No overview available."}</p>
-                        </div>
-                        
-                        <div>
-                          <h2 className="text-lg font-bold uppercase tracking-tight border-b border-border/50 pb-2 mb-4">Core Features</h2>
-                          <ul className="space-y-2">
-                            {(parsedPrd.features || []).map((feature: string, i: number) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="text-primary mt-1">▹</span>
-                                <span className="text-foreground/80">{feature}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        
-                        <div>
-                          <h2 className="text-lg font-bold uppercase tracking-tight border-b border-border/50 pb-2 mb-4">Architecture</h2>
-                          <p className="text-foreground/80 leading-relaxed">{parsedPrd.architecture || "No architecture details available."}</p>
-                        </div>
-                        
-                        <div>
-                          <h2 className="text-lg font-bold uppercase tracking-tight border-b border-border/50 pb-2 mb-4">Modernization Recommendations</h2>
-                          <ul className="space-y-3">
-                            {(parsedPrd.modernization_recommendations || []).map((rec: string, i: number) => (
-                              <li key={i} className="bg-muted/20 p-3 border-l-2 border-secondary text-foreground/80 text-sm">
-                                {rec}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+                  <div className="space-y-8">
+                    <div>
+                      <h1 className="text-2xl font-bold uppercase tracking-tight border-b border-border/50 pb-2 mb-4 text-primary">System Overview</h1>
+                      <p className="text-foreground/80 leading-relaxed">{parsedPrd.overview || 'No overview available.'}</p>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold uppercase tracking-tight border-b border-border/50 pb-2 mb-4">Sections</h2>
+                      <div className="space-y-4">
+                        {(parsedPrd.sections || []).map((section: { title?: string; content?: string }, i: number) => (
+                          <div key={i} className="border border-border/40 bg-muted/10 p-4">
+                            <div className="font-mono text-xs uppercase tracking-widest text-primary mb-2">{section.title}</div>
+                            <div className="text-sm text-foreground/80 whitespace-pre-wrap">{section.content}</div>
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <pre className="p-4 bg-black/50 border border-border/50 rounded-none overflow-x-auto text-xs text-foreground/80 font-mono whitespace-pre-wrap">
-                        {prdDoc.content}
-                      </pre>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
+            ) : (
+              <pre className="p-4 bg-black/50 border border-border/50 rounded-none overflow-x-auto text-xs text-foreground/80 font-mono whitespace-pre-wrap">
+                {prdDoc.content}
+              </pre>
             )}
           </Card>
         </TabsContent>
