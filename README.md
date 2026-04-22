@@ -23,6 +23,38 @@ A production-grade monorepo that orchestrates multiple AI agents to parse, analy
 
 ---
 
+## Quick Start
+
+### Installation
+```bash
+# Install dependencies across all workspace packages
+pnpm install
+```
+
+### Running Services
+
+**API Server** (backend, port 3000):
+```bash
+pnpm --filter @workspace/api-server run dev
+```
+
+**Frontend** (React + Vite, port 21168):
+```bash
+PORT=21168 BASE_PATH=/ pnpm --filter @workspace/legacy-modernization-ui run dev
+```
+
+**Code Generation** (OpenAPI → TypeScript):
+```bash
+pnpm --filter @workspace/api-spec run codegen
+```
+
+**Full Typecheck**:
+```bash
+pnpm run typecheck
+```
+
+---
+
 ## Agents
 
 ### Agent 1 — Ingestion

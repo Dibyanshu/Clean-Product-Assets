@@ -32,10 +32,18 @@ A production-grade backend + React dashboard for orchestrating AI agents to anal
 
 ## Key Commands
 
+### Workspace-wide
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
+- `pnpm install` — install all dependencies (required for pnpm monorepo)
+
+### API Server
+- `pnpm --filter @workspace/api-server run dev` — run API server on port 3000
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+
+### Frontend (React + Vite)
+- `PORT=21168 BASE_PATH=/ pnpm --filter @workspace/legacy-modernization-ui run dev` — run frontend dev server on port 21168
+  - **Alternative**: `pnpm -F @workspace/legacy-modernization-ui run dev` (with env vars pre-set)
 
 ## API Endpoints
 
