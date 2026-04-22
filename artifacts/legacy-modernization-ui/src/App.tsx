@@ -9,6 +9,8 @@ import { Dashboard } from "@/pages/dashboard";
 import { ProjectsList } from "@/pages/projects-list";
 import { ProjectDetail } from "@/pages/project-detail";
 import { JobsList } from "@/pages/jobs-list";
+import { DbBrowser } from "@/pages/db-browser";
+import { PipelineProvider } from "@/contexts/pipeline-context";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +29,7 @@ function Router() {
         <Route path="/projects" component={ProjectsList} />
         <Route path="/projects/:id" component={ProjectDetail} />
         <Route path="/jobs" component={JobsList} />
+        <Route path="/db-browser" component={DbBrowser} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -38,7 +41,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <PipelineProvider>
+            <Router />
+          </PipelineProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

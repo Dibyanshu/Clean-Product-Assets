@@ -362,6 +362,27 @@ export interface HldResponse {
   createdAt: string;
 }
 
+export interface DbTableInfo {
+  name: string;
+  rowCount: number;
+  columns: string[];
+}
+
+export interface DbTablesResponse {
+  tables: DbTableInfo[];
+}
+
+export type DbTableRowsResponseRowsItem = { [key: string]: unknown };
+
+export interface DbTableRowsResponse {
+  table: string;
+  columns: string[];
+  rows: DbTableRowsResponseRowsItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export type ListProjects200 = {
   projects: Project[];
 };
@@ -406,4 +427,15 @@ export type SemanticSearchParams = {
    * Max results to return (1–20)
    */
   n?: number;
+};
+
+export type GetDbTableRowsParams = {
+  /**
+   * Page number (1-indexed)
+   */
+  page?: number;
+  /**
+   * Rows per page (max 200)
+   */
+  limit?: number;
 };

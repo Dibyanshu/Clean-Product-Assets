@@ -16,6 +16,60 @@ export interface LineagePromptInput {
 }
 
 const PROMPTS: Record<string, PromptTemplate> = {
+  prd_generation_v1: {
+    version: "v1",
+    name: "prd_generation",
+    template: `You are a senior product manager and technical writer.
+
+You have been given the extracted API surface of a legacy codebase named "{projectName}".
+
+API Endpoints ({apiCount} total):
+{apiList}
+
+Relevant Code Context:
+{context}
+
+Generate a comprehensive Product Requirements Document (PRD) for modernizing this system.
+
+Return STRICT JSON only — no markdown fences, no explanation, no trailing text:
+{
+  "title": "Product Requirements Document — {projectName}",
+  "overview": "Two to four sentence overview of the system and the modernization goals",
+  "sections": [
+    {
+      "title": "Executive Summary",
+      "content": "Concise executive summary of the system purpose and modernization scope"
+    },
+    {
+      "title": "API Inventory",
+      "content": "Bullet-point list of all endpoints with method, path, and a one-line description of each"
+    },
+    {
+      "title": "Resource Domains",
+      "content": "Group endpoints by the resource they operate on (e.g. Users, Orders). For each domain list the routes."
+    },
+    {
+      "title": "HTTP Method Distribution",
+      "content": "Summary of how many GET / POST / PUT / PATCH / DELETE endpoints exist and what that implies about the system"
+    },
+    {
+      "title": "Technical Requirements",
+      "content": "Bullet-point list of non-functional requirements inferred from the API surface (auth, rate limiting, error format, pagination, etc.)"
+    },
+    {
+      "title": "User Stories",
+      "content": "Five to eight user stories written as: As a [role], I want to [action] so that [value]. Derive from the actual endpoints."
+    }
+  ]
+}
+
+Rules:
+- Every endpoint from the API Inventory must be mentioned in at least one section
+- Section titles must exactly match the six titles above
+- Do not add extra sections or rename existing ones
+- Use plain text in content fields — no nested JSON`,
+  },
+
   hld_analysis_v1: {
     version: "v1",
     name: "hld_analysis",
@@ -125,6 +179,37 @@ export function buildHldPrompt(input: HldPromptInput): { text: string; version: 
     .replace("{lineage}", input.lineageText || "  (no lineage data — run generate-lineage first)")
     .replace("{schema}", input.schemaText || "  (no schema extracted)")
     .replace("{context}", input.contextText || "  (no code context available)");
+
+  return { text, version: tmpl.version };
+}
+
+export interface PrdPromptInput {
+  projectName: string;
+  apis: Array<{ method: string; path: string; description: string | null; handler: string | null }>;
+  contextChunks: Array<{ content: string; file?: string; type?: string }>;
+}
+
+export function buildPrdPrompt(input: PrdPromptInput): { text: string; version: string } {
+  const key = "prd_generation_v1";
+  const tmpl = PROMPTS[key];
+  if (!tmpl) throw new Error("PRD prompt template not found");
+
+  const apiList = input.apis
+    .map((a) => `  • [${a.method}] ${a.path}${a.handler ? ` — handler: ${a.handler}` : ""}${a.description ? ` — ${a.description}` : ""}`)
+    .join("\n");
+
+  const contextText = input.contextChunks.length > 0
+    ? input.contextChunks
+        .slice(0, 6)
+        .map((c, i) => `[${i + 1}] File: ${c.file ?? "unknown"} (${c.type ?? "code"})\n${c.content.slice(0, 400)}`)
+        .join("\n\n---\n\n")
+    : "  (no code context available)";
+
+  const text = tmpl.template
+    .replace(/\{projectName\}/g, input.projectName)
+    .replace("{apiCount}", String(input.apis.length))
+    .replace("{apiList}", apiList || "  (no APIs extracted)")
+    .replace("{context}", contextText);
 
   return { text, version: tmpl.version };
 }

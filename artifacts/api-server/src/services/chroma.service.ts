@@ -148,3 +148,9 @@ export function deleteCollection(projectId: string): void {
 export function getDocumentCount(projectId: string): number {
   return store.get(projectId)?.documents.size ?? 0;
 }
+
+export function getAllDocuments(projectId: string): StoredDocument[] {
+  const coll = store.get(projectId);
+  if (!coll) return [];
+  return Array.from(coll.documents.values());
+}

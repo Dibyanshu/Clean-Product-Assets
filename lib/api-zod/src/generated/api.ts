@@ -456,3 +456,46 @@ export const SemanticSearchResponse = zod.object({
     }),
   ),
 });
+
+/**
+ * @summary List all SQLite tables with column info and row counts
+ */
+export const ListDbTablesResponse = zod.object({
+  tables: zod.array(
+    zod.object({
+      name: zod.string(),
+      rowCount: zod.number(),
+      columns: zod.array(zod.string()),
+    }),
+  ),
+});
+
+/**
+ * @summary Query rows from a SQLite table with pagination
+ */
+export const GetDbTableRowsParams = zod.object({
+  table: zod.coerce.string().describe("Table name"),
+});
+
+export const getDbTableRowsQueryPageDefault = 1;
+export const getDbTableRowsQueryLimitDefault = 50;
+
+export const GetDbTableRowsQueryParams = zod.object({
+  page: zod.coerce
+    .number()
+    .default(getDbTableRowsQueryPageDefault)
+    .describe("Page number (1-indexed)"),
+  limit: zod.coerce
+    .number()
+    .default(getDbTableRowsQueryLimitDefault)
+    .describe("Rows per page (max 200)"),
+});
+
+export const GetDbTableRowsResponse = zod.object({
+  table: zod.string(),
+  columns: zod.array(zod.string()),
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+  total: zod.number(),
+  page: zod.number(),
+  limit: zod.number(),
+});

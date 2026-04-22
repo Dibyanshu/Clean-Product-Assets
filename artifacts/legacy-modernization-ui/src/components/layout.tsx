@@ -1,14 +1,17 @@
 import { Link, useLocation } from "wouter";
-import { Terminal, FolderGit2, Activity, Rocket } from "lucide-react";
+import { Terminal, FolderGit2, Activity, Rocket, DatabaseZap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePipeline } from "@/contexts/pipeline-context";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { isRunning, step } = usePipeline();
 
   const navItems = [
     { href: "/", label: "Terminal", icon: Terminal },
     { href: "/projects", label: "Projects", icon: FolderGit2 },
     { href: "/jobs", label: "Operations", icon: Activity },
+    { href: "/db-browser", label: "DB Browser", icon: DatabaseZap },
   ];
 
   return (
@@ -22,7 +25,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
-            
+            const showPulse = item.href === "/" && isRunning;
+
             return (
               <Link key={item.href} href={item.href} className="outline-none focus:ring-1 focus:ring-ring focus:ring-offset-1 focus:ring-offset-background">
                 <div
@@ -36,6 +40,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 >
                   <Icon className="w-4 h-4 mr-3 shrink-0" />
                   {item.label}
+                  {showPulse && (
+                    <span className="ml-auto flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                      <span className="text-[9px] font-mono uppercase text-secondary tracking-wider">
+                        live
+                      </span>
+                    </span>
+                  )}
+                  {!isRunning && step === "complete" && item.href === "/" && (
+                    <span className="ml-auto flex items-center">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+                    </span>
+                  )}
                 </div>
               </Link>
             );

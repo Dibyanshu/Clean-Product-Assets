@@ -21,6 +21,7 @@ import { testAstMultiHandler } from "../modules/ast-test/controller/astTest.cont
 import { generateLineageHandler, getLineageHandler } from "../modules/lineage/controller/lineage.controller.js";
 import { lineageAIController } from "../modules/lineage-ai/controller/lineageAI.controller.js";
 import { hldController } from "../modules/hld/controller/hld.controller.js";
+import { listTablesHandler, getTableRowsHandler } from "../modules/db-admin/controller/dbAdmin.controller.js";
 import { listJobs, getJob } from "../utils/jobTracker.js";
 
 const agentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -45,6 +46,12 @@ const agentRoutes: FastifyPluginAsync = async (fastify) => {
 
   await fastify.register(lineageAIController, { prefix: "/agent" });
   await fastify.register(hldController, { prefix: "/agent" });
+
+  fastify.get("/admin/db/tables", listTablesHandler);
+  fastify.get<{ Params: { table: string }; Querystring: { page?: string; limit?: string } }>(
+    "/admin/db/tables/:table/rows",
+    getTableRowsHandler,
+  );
 
   fastify.get("/agent/jobs", async (_request, reply) => {
     return reply.send({ jobs: listJobs() });

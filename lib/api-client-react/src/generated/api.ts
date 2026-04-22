@@ -25,6 +25,8 @@ import type {
   BulkAILineageResult,
   BulkEnhanceLineageAIRequest,
   DbSchemaResult,
+  DbTableRowsResponse,
+  DbTablesResponse,
   EnhanceLineageAIRequest,
   ErrorResponse,
   ExtractDbSchemaRequest,
@@ -33,6 +35,7 @@ import type {
   GenerateLineageRequest,
   GeneratePRDRequest,
   GeneratePRDResponse,
+  GetDbTableRowsParams,
   GetHldParams,
   GetLineageParams,
   HealthStatus,
@@ -1909,6 +1912,193 @@ export function useSemanticSearch<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getSemanticSearchQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all SQLite tables with column info and row counts
+ */
+export const getListDbTablesUrl = () => {
+  return `/api/admin/db/tables`;
+};
+
+export const listDbTables = async (
+  options?: RequestInit,
+): Promise<DbTablesResponse> => {
+  return customFetch<DbTablesResponse>(getListDbTablesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDbTablesQueryKey = () => {
+  return [`/api/admin/db/tables`] as const;
+};
+
+export const getListDbTablesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDbTables>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDbTables>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListDbTablesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listDbTables>>> = ({
+    signal,
+  }) => listDbTables({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDbTables>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDbTablesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDbTables>>
+>;
+export type ListDbTablesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all SQLite tables with column info and row counts
+ */
+
+export function useListDbTables<
+  TData = Awaited<ReturnType<typeof listDbTables>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDbTables>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDbTablesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Query rows from a SQLite table with pagination
+ */
+export const getGetDbTableRowsUrl = (
+  table: string,
+  params?: GetDbTableRowsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/db/tables/${table}/rows?${stringifiedParams}`
+    : `/api/admin/db/tables/${table}/rows`;
+};
+
+export const getDbTableRows = async (
+  table: string,
+  params?: GetDbTableRowsParams,
+  options?: RequestInit,
+): Promise<DbTableRowsResponse> => {
+  return customFetch<DbTableRowsResponse>(getGetDbTableRowsUrl(table, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDbTableRowsQueryKey = (
+  table: string,
+  params?: GetDbTableRowsParams,
+) => {
+  return [
+    `/api/admin/db/tables/${table}/rows`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetDbTableRowsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDbTableRows>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  table: string,
+  params?: GetDbTableRowsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDbTableRows>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetDbTableRowsQueryKey(table, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getDbTableRows>>> = ({
+    signal,
+  }) => getDbTableRows(table, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!table,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDbTableRows>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDbTableRowsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDbTableRows>>
+>;
+export type GetDbTableRowsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Query rows from a SQLite table with pagination
+ */
+
+export function useGetDbTableRows<
+  TData = Awaited<ReturnType<typeof getDbTableRows>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  table: string,
+  params?: GetDbTableRowsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDbTableRows>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDbTableRowsQueryOptions(table, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
