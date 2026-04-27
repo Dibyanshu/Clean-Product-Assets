@@ -563,6 +563,31 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 
 ## Running Locally
 
+### Using Docker
+
+Go to your project root folder and run the below command
+
+```bash
+# Install all dependencies and run the application using docker
+docker compose up --build -d
+```
+
+### Without Docker
+
+Go to your project root folder and run the below commands
+
+```bash
+#Install pnpm globally
+npm i -g pnpm
+
+# Install all dependencies
+pnpm install
+
+#Run PowerShell Script file
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+```
+or
+
 ```bash
 # Install all dependencies
 pnpm install
