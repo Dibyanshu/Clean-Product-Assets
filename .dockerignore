@@ -1,0 +1,15 @@
+.git
+.gitignore
+.cursor
+.vscode
+node_modules
+**/node_modules
+dist
+**/dist
+.env
+**/.env
+**/.env.*
+*.log
+coverage
+tmp
+out-tsc

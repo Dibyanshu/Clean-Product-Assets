@@ -61,7 +61,6 @@ Start-Sleep -Seconds 2
 
 Write-Host "Starting Backend API Server (port 3000)..." -ForegroundColor Cyan
 $apiScript = @"
-cd 'd:\Project\Clean-Product-Assets'
 pnpm --filter @workspace/api-server run dev
 "@
 
@@ -75,7 +74,6 @@ Start-Sleep -Seconds 5
 
 Write-Host "Starting Frontend Dev Server (port 21168)..." -ForegroundColor Cyan
 $frontendScript = @"
-cd 'd:\Project\Clean-Product-Assets'
 `$env:PORT='21168'
 `$env:BASE_PATH='/'
 pnpm --filter @workspace/legacy-modernization-ui run dev
