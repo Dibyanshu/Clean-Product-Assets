@@ -52,7 +52,7 @@ CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
 FROM base AS build-frontend
 ARG PORT=21168
 ARG BASE_PATH=/
-ARG VITE_API_BASE_URL=/api/
+ARG VITE_API_BASE_URL=
 ENV PORT=$PORT
 ENV BASE_PATH=$BASE_PATH
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL

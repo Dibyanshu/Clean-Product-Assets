@@ -36,7 +36,7 @@ export default defineConfig({
     host: "0.0.0.0",
     allowedHosts: true,
     proxy: {
-      "/api": "http://localhost:8080",
+      "/api": "http://localhost:3000",
     },
     fs: {
       strict: true,
