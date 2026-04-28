@@ -23,6 +23,38 @@ A production-grade monorepo that orchestrates multiple AI agents to parse, analy
 
 ---
 
+## Quick Start
+
+### Installation
+```bash
+# Install dependencies across all workspace packages
+pnpm install
+```
+
+### Running Services
+
+**API Server** (backend, port 3000):
+```bash
+pnpm --filter @workspace/api-server run dev
+```
+
+**Frontend** (React + Vite, port 21168):
+```bash
+PORT=21168 BASE_PATH=/ pnpm --filter @workspace/legacy-modernization-ui run dev
+```
+
+**Code Generation** (OpenAPI → TypeScript):
+```bash
+pnpm --filter @workspace/api-spec run codegen
+```
+
+**Full Typecheck**:
+```bash
+pnpm run typecheck
+```
+
+---
+
 ## Agents
 
 ### Agent 1 — Ingestion
@@ -530,6 +562,31 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 ---
 
 ## Running Locally
+
+### Using Docker
+
+Go to your project root folder and run the below command
+
+```bash
+# Install all dependencies and run the application using docker
+docker compose up --build -d
+```
+
+### Without Docker
+
+Go to your project root folder and run the below commands
+
+```bash
+#Install pnpm globally
+npm i -g pnpm
+
+# Install all dependencies
+pnpm install
+
+#Run PowerShell Script file
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+```
+or
 
 ```bash
 # Install all dependencies
