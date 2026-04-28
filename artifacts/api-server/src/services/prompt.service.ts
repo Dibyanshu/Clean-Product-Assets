@@ -15,7 +15,77 @@ export interface LineagePromptInput {
   deterministicTables: LineageTableRef[];
 }
 
+export interface AnalysisQueryPlanningPromptInput {
+  projectName: string;
+  files: Array<{ path: string; extension: string | null; sizeBytes: number }>;
+}
+
+export interface AnalysisRouteExtractionPromptInput {
+  chunks: Array<{ content: string; file?: string; type?: string }>;
+}
+
 const PROMPTS: Record<string, PromptTemplate> = {
+  analysis_query_planning_v1: {
+    version: "v1",
+    name: "analysis_query_planning",
+    template: `You are a senior backend codebase analyst planning semantic retrieval for API route extraction.
+
+Project: {projectName}
+
+File Inventory:
+{files}
+
+Generate comprehensive search queries to retrieve all code needed to extract API routes from this codebase.
+
+Return STRICT JSON only - no markdown fences, no explanation, no trailing text:
+{
+  "queries": [
+    "express router route handler controller middleware auth service business logic route registration"
+  ]
+}
+
+Rules:
+- Require all possible useful queries focused on routing frameworks, controllers, middleware, auth, services, business logic, and route registration
+- Include framework-specific terms suggested by the file inventory when possible, such as Express, Fastify, NestJS, Spring, ASP.NET, Rails, Laravel, Django, Flask, or Go routers
+- Include queries for route registration entrypoints, controller classes, router modules, middleware chains, authentication/authorization guards, service methods, and business workflow handlers
+- Prefer precise multi-term queries over generic one-word queries
+- Do not include duplicate or near-duplicate queries
+- Return only the JSON object with a "queries" string array`,
+  },
+
+  analysis_route_extraction_v1: {
+    version: "v1",
+    name: "analysis_route_extraction",
+    template: `You are a senior backend API analyst extracting routes from retrieved code context.
+
+Retrieved Code Context:
+{chunks}
+
+Extract API endpoints that are directly supported by the retrieved code context.
+
+Return STRICT JSON only - no markdown fences, no explanation, no trailing text:
+{
+  "apis": [
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "description": "List users",
+      "handler": "UserController.list"
+    }
+  ]
+}
+
+Rules:
+- Only include routes supported by the retrieved code
+- Valid methods are GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD
+- Paths must start with "/" and should use normalized path parameters like ":id"
+- Combine mounted router prefixes with child routes when both are visible in context
+- description and handler may be null if unknown
+- Omit uncertain routes rather than guessing
+- Do not invent endpoints from filenames alone
+- Return only the JSON object with an "apis" array`,
+  },
+
   prd_generation_v1: {
     version: "v1",
     name: "prd_generation",
@@ -162,6 +232,38 @@ export function getPrompt(name: string): PromptTemplate {
 
 export function getLatestVersion(name: string): string {
   return getPrompt(name).version;
+}
+
+export function buildAnalysisQueryPlanningPrompt(input: AnalysisQueryPlanningPromptInput): { text: string; version: string } {
+  const tmpl = getPrompt("analysis_query_planning");
+
+  const filesText = input.files.length > 0
+    ? input.files
+        .slice(0, 120)
+        .map((f) => `  - ${f.path} (${f.extension ?? "no extension"}, ${f.sizeBytes} bytes)`)
+        .join("\n")
+    : "  (no files available)";
+
+  const text = tmpl.template
+    .replace("{projectName}", input.projectName)
+    .replace("{files}", filesText);
+
+  return { text, version: tmpl.version };
+}
+
+export function buildAnalysisRouteExtractionPrompt(input: AnalysisRouteExtractionPromptInput): { text: string; version: string } {
+  const tmpl = getPrompt("analysis_route_extraction");
+
+  const chunksText = input.chunks.length > 0
+    ? input.chunks
+        .slice(0, 20)
+        .map((c, i) => `[${i + 1}] File: ${c.file ?? "unknown"} (${c.type ?? "code"})\n${c.content.slice(0, 700)}`)
+        .join("\n\n---\n\n")
+    : "  (no relevant code chunks found)";
+
+  const text = tmpl.template.replace("{chunks}", chunksText);
+
+  return { text, version: tmpl.version };
 }
 
 export interface HldPromptInput {

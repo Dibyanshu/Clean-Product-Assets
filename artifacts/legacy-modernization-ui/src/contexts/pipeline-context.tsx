@@ -210,7 +210,7 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       if (s === "ingesting") {
         addLog(`[INGEST] Repository cloned and indexed.`, "success");
         advanceTo("analyzing");
-        addLog(`[ANALYZE] Extracting API routes via AST...`, "info");
+        addLog(`[ANALYZE] Extracting API routes via LLM...`, "info");
         analyzeMutation.mutate({ data: { projectId: pid! } }, {
           onSuccess: (d) => setCurrentJobId(d.jobId),
           onError:   (e) => { addLog(`[ANALYZE] Failed: ${e.message}`, "error"); advanceTo("error"); },

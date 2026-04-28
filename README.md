@@ -559,6 +559,12 @@ curl "http://localhost/api/agent/search?projectId=$PROJECT_ID&q=user+authenticat
 | Fallback | Deterministic lineage returned unchanged | Error returned to caller |
 | Caching | `projectId::apiId::promptVersion` | Not cached (re-generates on each call) |
 
+## TODO
+
+| Area | Current State | Current Implementation | Later Change | Why It Matters |
+|---|---|---|---|---|
+| OpenAI env loading | API LLM calls use the shared `@workspace/integrations-openai-ai-server` OpenAI client | `artifacts/api-server/src/services/llm.service.ts` loads local `.env` files before first client access | Move env loading to API startup or the shared OpenAI integration package | Keeps OpenAI configuration centralized and avoids app-specific env logic inside the LLM wrapper |
+
 ---
 
 ## Running Locally
