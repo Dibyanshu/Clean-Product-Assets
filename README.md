@@ -14,7 +14,7 @@ A production-grade monorepo that orchestrates multiple AI agents to parse, analy
 | API framework | Fastify 5 (plugin-based clean architecture) |
 | Database | SQLite via sql.js (pure JS, no native deps) |
 | Vector store | In-memory TF-IDF (ChromaDB-compatible interface) |
-| LLM | OpenAI `gpt-5-mini` via Replit AI Integrations proxy |
+| LLM | OpenAI `gpt-5-mini` via the standard OpenAI SDK (`OPENAI_API_KEY`, optional `OPENAI_BASE_URL`) |
 | Validation | Zod |
 | Frontend | React 18 + Vite + Tailwind CSS + shadcn/ui |
 | API client | Orval codegen from OpenAPI 3.1 spec |
