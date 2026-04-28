@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
-    "start": "cross-env PORT=3000 node --enable-source-maps ./dist/index.mjs",
+    "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -29,7 +29,6 @@
     "@types/babel__traverse": "^7.28.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "catalog:",
-    "cross-env": "^10.1.0",
     "esbuild": "^0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13",
