@@ -29,6 +29,12 @@ const SKIP_DIRS = new Set([
 const MAX_FILE_SIZE = 150_000;
 const CLONE_TIMEOUT_MS = 90_000;
 
+type RawFile = { path: string; extension: string; size: number; content: string };
+
+function supportedExtensionsText(): string {
+  return Array.from(SUPPORTED_EXTENSIONS).sort().join(", ");
+}
+
 function walkDirectory(dir: string): Array<{ fullPath: string; relativePath: string; ext: string; size: number }> {
   const results: Array<{ fullPath: string; relativePath: string; ext: string; size: number }> = [];
 
@@ -313,7 +319,7 @@ A legacy e-commerce backend in Express.js + SQLite with Java/C# service layer.
 async function ingestFromGit(
   repoUrl: string,
   projectId: string,
-): Promise<{ files: Array<{ path: string; extension: string; size: number; content: string }>; method: "git" | "demo" }> {
+): Promise<{ files: RawFile[]; method: "git" }> {
   const tmpDir = `/tmp/archonai-${projectId}`;
 
   try {
@@ -327,12 +333,14 @@ async function ingestFromGit(
     logger.info({ projectId, found: entries.length }, "[IngestionAgent] Files found in cloned repo");
 
     if (entries.length === 0) {
-      logger.warn({ projectId }, "[IngestionAgent] No supported files found — falling back to demo dataset");
+      logger.warn({ projectId }, "[IngestionAgent] No supported files found");
       cleanupDir(tmpDir);
-      return buildDemoDataset();
+      throw new Error(
+        `Repository cloned successfully, but no supported files were found. Supported extensions: ${supportedExtensionsText()}`,
+      );
     }
 
-    const files: Array<{ path: string; extension: string; size: number; content: string }> = [];
+    const files: RawFile[] = [];
     for (const entry of entries) {
       try {
         const content = fs.readFileSync(entry.fullPath, "utf-8");
@@ -341,14 +349,22 @@ async function ingestFromGit(
       }
     }
 
+    if (files.length === 0) {
+      cleanupDir(tmpDir);
+      throw new Error("Repository files were discovered, but none could be read.");
+    }
+
     cleanupDir(tmpDir);
     logger.info({ projectId, fileCount: files.length }, "[IngestionAgent] Files read from real repo");
     return { files, method: "git" };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.warn({ projectId, error: message.slice(0, 200) }, "[IngestionAgent] git clone failed — falling back to demo dataset");
+    logger.warn({ projectId, error: message.slice(0, 200) }, "[IngestionAgent] Repository ingestion failed");
     cleanupDir(tmpDir);
-    return buildDemoDataset();
+    if (message.startsWith("Repository cloned successfully") || message.startsWith("Repository files were discovered")) {
+      throw err;
+    }
+    throw new Error(`Failed to clone repository: ${message}`);
   }
 }
 
@@ -376,59 +392,64 @@ export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
   const project = await ingestionRepo.createProject(repoUrl, repoName);
   logger.info({ projectId: project.id }, "[IngestionAgent] Project created");
 
-  await ingestionRepo.updateProjectStatus(project.id, "ingesting");
+  try {
+    await ingestionRepo.updateProjectStatus(project.id, "ingesting");
 
-  const { files: rawFiles, method } = await ingestFromGit(repoUrl, project.id);
+    const { files: rawFiles, method } = await ingestFromGit(repoUrl, project.id);
 
-  logger.info({ projectId: project.id, method, fileCount: rawFiles.length }, "[IngestionAgent] Source files loaded");
+    logger.info({ projectId: project.id, method, fileCount: rawFiles.length }, "[IngestionAgent] Source files loaded");
 
-  const storedFiles: ingestionRepo.ProjectFile[] = [];
-  for (const f of rawFiles) {
-    const file = await ingestionRepo.insertFile(project.id, f.path, f.extension, f.size);
-    storedFiles.push(file);
-  }
-
-  await ingestionRepo.updateProjectStatus(project.id, "ingested", storedFiles.length);
-  logger.info({ projectId: project.id, fileCount: storedFiles.length }, "[IngestionAgent] Ingestion complete");
-
-  chroma.createOrGetCollection(project.id);
-  const docs: Parameters<typeof chroma.upsertDocuments>[1] = [];
-  const langStats: Record<string, number> = {};
-
-  for (const f of rawFiles) {
-    if (!f.content) continue;
-
-    const chunks = extractChunks(f.path, f.content);
-
-    if (chunks.length > 0) {
-      for (const chunk of chunks) {
-        // Ensure all metadata values are string or undefined for index signature
-        const metadata = Object.fromEntries(
-          Object.entries(chunk.metadata).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : undefined])
-        );
-        docs.push({
-          id: chunk.id,
-          content: chunk.content,
-          metadata: metadata as Parameters<typeof chroma.upsertDocuments>[1][0]["metadata"],
-        });
-        langStats[chunk.metadata.language] = (langStats[chunk.metadata.language] ?? 0) + 1;
-      }
-    } else {
-      docs.push({
-        id: `${project.id}::raw::${f.path}`,
-        content: f.content.slice(0, 1500),
-        metadata: { type: "code", file: f.path },
-      });
+    const storedFiles: ingestionRepo.ProjectFile[] = [];
+    for (const f of rawFiles) {
+      const file = await ingestionRepo.insertFile(project.id, f.path, f.extension, f.size);
+      storedFiles.push(file);
     }
+
+    await ingestionRepo.updateProjectStatus(project.id, "ingested", storedFiles.length);
+    logger.info({ projectId: project.id, fileCount: storedFiles.length }, "[IngestionAgent] Ingestion complete");
+
+    chroma.createOrGetCollection(project.id);
+    const docs: Parameters<typeof chroma.upsertDocuments>[1] = [];
+    const langStats: Record<string, number> = {};
+
+    for (const f of rawFiles) {
+      if (!f.content) continue;
+
+      const chunks = extractChunks(f.path, f.content);
+
+      if (chunks.length > 0) {
+        for (const chunk of chunks) {
+          // Ensure all metadata values are string or undefined for index signature
+          const metadata = Object.fromEntries(
+            Object.entries(chunk.metadata).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : undefined])
+          );
+          docs.push({
+            id: chunk.id,
+            content: chunk.content,
+            metadata: metadata as Parameters<typeof chroma.upsertDocuments>[1][0]["metadata"],
+          });
+          langStats[chunk.metadata.language] = (langStats[chunk.metadata.language] ?? 0) + 1;
+        }
+      } else {
+        docs.push({
+          id: `${project.id}::raw::${f.path}`,
+          content: f.content.slice(0, 1500),
+          metadata: { type: "code", file: f.path },
+        });
+      }
+    }
+
+    chroma.upsertDocuments(project.id, docs);
+    logger.info(
+      { projectId: project.id, chunks: docs.length, languages: langStats },
+      "[IngestionAgent] AST chunks indexed in vector store",
+    );
+
+    return { projectId: project.id, projectName: repoName, fileCount: storedFiles.length, files: storedFiles };
+  } catch (err) {
+    await ingestionRepo.updateProjectStatus(project.id, "failed");
+    throw err;
   }
-
-  chroma.upsertDocuments(project.id, docs);
-  logger.info(
-    { projectId: project.id, chunks: docs.length, languages: langStats },
-    "[IngestionAgent] AST chunks indexed in vector store",
-  );
-
-  return { projectId: project.id, projectName: repoName, fileCount: storedFiles.length, files: storedFiles };
 }
 
 export async function getProject(projectId: string) {
