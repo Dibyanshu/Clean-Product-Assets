@@ -77,6 +77,16 @@ export async function runMigrations(): Promise<void> {
   `);
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS schema_versions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      extracted_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS db_columns (
       id TEXT PRIMARY KEY,
       table_id TEXT NOT NULL,
@@ -95,6 +105,45 @@ export async function runMigrations(): Promise<void> {
       name TEXT NOT NULL,
       parameters TEXT,
       description TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS db_relationships (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      from_table TEXT NOT NULL,
+      from_column TEXT NOT NULL,
+      to_table TEXT NOT NULL,
+      to_column TEXT NOT NULL,
+      constraint_name TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS db_views (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      definition TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS query_table_usage (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      table_name TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      is_join INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (project_id) REFERENCES projects(id)
     )

@@ -36,11 +36,14 @@ export async function extractDbSchemaHandler(
     reply.code(201).send({
       jobId: job.id,
       projectId,
+      version: result.version,
       tableCount: result.tables.length,
       functionCount: result.functions.length,
       tables: result.tables,
       functions: result.functions,
       extractedAt: result.extractedAt,
+      source: result.source,
+      warning: result.warning,
     });
   } catch (err) {
     updateJob(job.id, {
@@ -62,7 +65,7 @@ export async function getDbSchemaHandler(
   const schema = await dbSchemaService.getSchema(projectId);
 
   if (!schema) {
-    reply.send({ tables: [], functions: [], extractedAt: null });
+    reply.send({ tables: [], functions: [], extractedAt: null, source: null, warning: null });
     return;
   }
 

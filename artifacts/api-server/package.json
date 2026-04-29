@@ -21,6 +21,7 @@
     "drizzle-orm": "catalog:",
     "fastify": "^5.8.5",
     "fastify-plugin": "^5.1.0",
+    "node-sql-parser": "^5.4.0",
     "pino": "^9",
     "sql.js": "^1.14.1",
     "zod": "catalog:"
